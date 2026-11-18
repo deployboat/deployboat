@@ -45,9 +45,11 @@ command -v railpack >/dev/null || curl -fsSL https://railpack.com/install.sh | b
 
 say "Starting BuildKit and Caddy"
 docker network inspect deployboat >/dev/null 2>&1 || docker network create deployboat >/dev/null
+# Let Caddy (inside Docker) reach Deploy Boat on the host. Not open to the internet.
+ufw allow from 172.16.0.0/12 to any port 3000 proto tcp >/dev/null
 docker inspect buildkit >/dev/null 2>&1 || docker run -d --name buildkit --privileged --restart unless-stopped moby/buildkit >/dev/null 2>&1
 mkdir -p /var/lib/deployboat/caddy
-echo '{"admin":{"listen":"0.0.0.0:2019"}}' > /var/lib/deployboat/caddy/initial.json
+echo '{"admin":{"listen":"0.0.0.0:2019","origins":["127.0.0.1:2019","localhost:2019"]}}' > /var/lib/deployboat/caddy/initial.json
 docker inspect caddy >/dev/null 2>&1 || docker run -d --name caddy --restart unless-stopped \
   --network deployboat --add-host host.docker.internal:host-gateway \
   -p 80:80 -p 443:443 -p 127.0.0.1:2019:2019 \

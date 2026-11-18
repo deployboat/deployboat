@@ -17,7 +17,8 @@ export async function syncRoutes() {
   ];
 
   const caddyConfig = {
-    admin: { listen: "0.0.0.0:2019" },
+    // Caddy only accepts admin calls whose Host matches one of these.
+    admin: { listen: "0.0.0.0:2019", origins: ["127.0.0.1:2019", "localhost:2019"] },
     apps: { http: { servers: { main: { listen: [":80", ":443"], routes } } } },
   };
 

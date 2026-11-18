@@ -9,4 +9,11 @@ console.log(`Deploy Boat running on :${config.port}`);
 console.log(`Dashboard: https://${config.dashboardHost}`);
 console.log(`Token:     ${config.token}`);
 
-syncRoutes().catch((e) => console.error("Caddy sync failed:", e.message));
+// Caddy may still be starting, so keep trying for a minute.
+for (let i = 1; i <= 30; i++) {
+  try { await syncRoutes(); console.log("Caddy routes synced"); break; }
+  catch (e) {
+    if (i === 30) console.error("Caddy sync failed:", (e as Error).message);
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+}
