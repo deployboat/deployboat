@@ -1,5 +1,7 @@
 // One app. The sidebar picks the section; each section is a small function below.
 import { api, esc, timeAgo, statusOf, icon, toast, copy } from "../app.js";
+import { share } from "./share.js";
+import { crons } from "./crons.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -9,9 +11,10 @@ export const SECTIONS = [
   ["variables", "Variables", "key"],
   ["database", "Database", "db"],
   ["storage", "Storage", "folder"],
-  ["domains", "Domains", "globe", true],
-  ["share", "Share", "share", true],
-  ["crons", "Crons", "clock", true],
+  ["settings", "Settings", "gear"],
+  ["domains", "Domains", "globe"],
+  ["share", "Share", "share"],
+  ["crons", "Crons", "clock"],
 ];
 
 export async function appScreen(view, name, section) {
@@ -20,15 +23,24 @@ export async function appScreen(view, name, section) {
   const title = SECTIONS.find(([id]) => id === section)?.[1] ?? "Overview";
   view.innerHTML = `
     <div class="row spread head">
-      <div><div class="muted" style="font-size:13px">${esc(name)}</div>
+      <div><div class="muted" style="font-size:13px">${esc(app.displayName)}</div>
         <div class="row"><h1>${title}</h1><span class="status ${s}">${s}</span></div></div>
-      <a class="btn" href="${esc(app.url)}" target="_blank">${icon("external")} Open site</a>
+      <div class="row" style="gap:8px">
+        <a class="btn" href="${esc(app.url)}" target="_blank">${icon("external")} Open site</a>
+        ${app.stopped
+          ? `<button class="btn primary" id="toggle">${icon("play")} Start</button>`
+          : `<button class="btn" id="toggle">${icon("stop")} Stop</button>`}
+        <button class="btn" id="restart" ${app.stopped ? "disabled" : ""}>${icon("restart")} Restart</button>
+      </div>
     </div>
     <div id="section"></div>`;
 
   const box = view.querySelector("#section");
   const base = `/api/apps/${encodeURIComponent(name)}`;
-  const show = { overview, versions, logs, variables, database, storage }[section] ?? overview;
+  headerActions(view, base, app);
+  const navTitle = document.querySelector(".navtitle");
+  if (navTitle) navTitle.textContent = app.displayName;
+  const show = { overview, versions, logs, variables, database, storage, domains, share, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -50,6 +62,24 @@ function wireFields(box) {
   }));
 }
 
+// Stop/Start and Restart live in the page header, on every section.
+function headerActions(view, base, app) {
+  const redraw = () => dispatchEvent(new HashChangeEvent("hashchange"));
+  view.querySelector("#restart").onclick = async (e) => {
+    const b = e.currentTarget; b.disabled = true;
+    try { await api(`${base}/restart`, { method: "POST" }); toast("Restarted"); }
+    catch (err) { toast(err.message); }
+    b.disabled = false;
+  };
+  view.querySelector("#toggle").onclick = async (e) => {
+    const action = app.stopped ? "start" : "stop";
+    if (action === "stop" && !confirm(`Stop ${app.name}? The site goes offline until you start it again.`)) return;
+    const b = e.currentTarget; b.disabled = true;
+    try { await api(`${base}/${action}`, { method: "POST" }); toast(action === "stop" ? "Stopped" : "Started"); redraw(); }
+    catch (err) { toast(err.message); b.disabled = false; }
+  };
+}
+
 function overview(box, base, app) {
   box.innerHTML = `
     <div class="card pad">
@@ -61,27 +91,8 @@ function overview(box, base, app) {
         ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
       </dl>
     </div>
-    <form class="card pad" id="rename" style="margin-top:14px">
-      <b>App name</b>
-      <p class="muted" style="font-size:13px;margin:2px 0 10px">Changes the address too. Database, files and your project folder keep working.</p>
-      <div class="row"><input name="name" value="${esc(app.name)}" style="flex:1;min-width:180px" pattern="[a-z0-9][a-z0-9\-]*" required>
-        <button class="btn primary">Rename</button></div>
-    </form>
-    <div class="row" style="margin-top:14px">
-      ${app.git ? `<button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button>` : ""}
-      ${app.stopped
-        ? `<button class="btn primary" id="toggle">${icon("play")} Start</button>`
-        : `<button class="btn" id="toggle">${icon("stop")} Stop</button>`}
-      <button class="btn" id="restart">${icon("restart")} Restart</button>
-      <button class="btn danger" id="delete">${icon("trash")} Delete app</button>
-    </div>`;
+    ${app.git ? `<div class="row" style="margin-top:14px"><button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button></div>` : ""}`;
 
-  box.querySelector("#restart").onclick = async (e) => {
-    e.currentTarget.disabled = true;
-    try { await api(`${base}/restart`, { method: "POST" }); toast("Restarted"); }
-    catch (err) { toast(err.message); }
-    box.querySelector("#restart").disabled = false;
-  };
   box.querySelector("#redeploy")?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;
     try {
@@ -90,34 +101,112 @@ function overview(box, base, app) {
       location.hash = `#/apps/${encodeURIComponent(app.name)}/versions`;
     } catch (err) { toast(err.message); }
   });
-  box.querySelector("#toggle").onclick = async (e) => {
-    const action = app.stopped ? "start" : "stop";
-    if (action === "stop" && !confirm(`Stop ${app.name}? The site goes offline until you start it again.`)) return;
-    e.currentTarget.disabled = true;
-    try {
-      await api(`${base}/${action}`, { method: "POST" });
-      toast(action === "stop" ? "Stopped" : "Started");
-      dispatchEvent(new HashChangeEvent("hashchange")); // redraw page + status
-    } catch (err) { toast(err.message); box.querySelector("#toggle").disabled = false; }
-  };
-  const form = box.querySelector("#rename");
+}
+
+// App settings: name, delete. (The address is on the Domains page.)
+function settings(box, base, app) {
+  box.innerHTML = `
+    <form class="card pad" id="dname">
+      <b>App name</b>
+      <p class="muted" style="font-size:13px;margin:2px 0 10px">Only shown in the dashboard. To change the web address, go to Domains.</p>
+      <div class="row"><input name="displayName" value="${esc(app.displayName)}" maxlength="60" style="flex:1;min-width:180px" required>
+        <button class="btn primary">Save</button></div>
+    </form>
+    <div class="card pad danger-zone" style="margin-top:14px">
+      <b>Delete app</b>
+      <p class="muted" style="font-size:13px;margin:2px 0 10px">Takes the site offline and removes it from Deploy Boat. Its database and files are kept.</p>
+      <button class="btn danger" id="delete">${icon("trash")} Delete ${esc(app.displayName)}</button>
+    </div>`;
+
+  const form = box.querySelector("#dname");
   form.onsubmit = async (e) => {
     e.preventDefault();
-    const newName = form.name.value.trim().toLowerCase();
-    if (newName === app.name) return;
-    if (!confirm(`Rename ${app.name} to ${newName}? The site address changes too.`)) return;
-    form.querySelector("button").disabled = true;
     try {
-      const r = await api(`${base}/rename`, { method: "POST", body: { newName } });
-      toast("Renamed");
-      location.hash = `#/apps/${encodeURIComponent(r.name)}/overview`;
-    } catch (err) { toast(err.message); form.querySelector("button").disabled = false; }
+      await api(`${base}/display-name`, { method: "PUT", body: { displayName: form.displayName.value } });
+      toast("Saved");
+      dispatchEvent(new HashChangeEvent("hashchange"));
+    } catch (err) { toast(err.message); }
   };
   box.querySelector("#delete").onclick = async () => {
-    if (!confirm(`Delete ${app.name}? The site goes offline. Its database and files are kept.`)) return;
+    if (!confirm(`Delete ${app.displayName}? The site goes offline. Its database and files are kept.`)) return;
     try { await api(base, { method: "DELETE" }); toast("Deleted"); location.hash = "#/"; }
     catch (err) { toast(err.message); }
   };
+}
+
+// Domains: change the free address, add your own domains.
+async function domains(box, base, app) {
+  const d = await api(`${base}/domains`);
+  box.innerHTML = `
+    <form class="card pad" id="address">
+      <b>Free address</b>
+      <p class="muted" style="font-size:13px;margin:2px 0 10px">Always works, HTTPS included. Changing it keeps your database, files and project folder working.</p>
+      <div class="row" style="flex-wrap:nowrap">
+        <input name="name" value="${esc(app.name)}" pattern="[a-z0-9][a-z0-9\-]*" required style="flex:1;min-width:100px">
+        <span class="muted" style="white-space:nowrap">.${esc(d.baseDomain)}</span>
+        <button class="btn primary">Change</button>
+      </div>
+    </form>
+
+    <div class="card" style="margin-top:14px">
+      <div class="pad" style="padding-bottom:0">
+        <b>Your own domains</b>
+        <p class="muted" style="font-size:13px;margin:2px 0 12px">Use a domain you own, like <code>myshop.com</code>. HTTPS is set up automatically.</p>
+        <form class="row" id="add" style="margin-bottom:16px">
+          <input name="host" placeholder="myshop.com" style="flex:1;min-width:180px" required autocomplete="off">
+          <button class="btn primary">${icon("plus")} Add domain</button>
+        </form>
+      </div>
+      <div class="list" style="border-top:1px solid var(--line)">${d.custom.map((x) => `
+        <div>
+          <span class="status ${x.ready ? "live" : "building"}">${x.ready ? "Connected" : "Waiting for DNS"}</span>
+          <a class="grow" href="https://${esc(x.host)}" target="_blank" style="text-decoration:none">${esc(x.host)}</a>
+          <button class="btn danger" data-del="${esc(x.host)}">${icon("trash")}</button>
+        </div>`).join("") || `<div class="muted">No domains yet.</div>`}
+      </div>
+    </div>
+
+    ${d.custom.some((x) => !x.ready) || !d.custom.length ? `
+    <div class="card pad" style="margin-top:14px">
+      <b>How to connect a domain</b>
+      <ol class="steps" style="margin-top:10px">
+        <li>Open the DNS settings where you bought the domain (Namecheap, GoDaddy, Cloudflare…).</li>
+        <li>Add an <b>A record</b>: name <code>@</code> (or <code>www</code>), value <code>${esc(d.ip)}</code>.</li>
+        <li>Wait a few minutes. The status here turns to <b>Connected</b> by itself.</li>
+      </ol>
+      <p class="note" style="margin-top:10px">Using Cloudflare? Set the record to "DNS only" (grey cloud) so HTTPS can be set up.</p>
+    </div>` : ""}`;
+
+  box.querySelector("#address").onsubmit = async (e) => {
+    e.preventDefault();
+    const newName = e.target.name.value.trim().toLowerCase();
+    if (newName === app.name) return;
+    if (!confirm(`Change the address to ${newName}.${d.baseDomain}? The old address stops working.`)) return;
+    try {
+      const r = await api(`${base}/rename`, { method: "POST", body: { newName } });
+      toast("Address changed");
+      location.hash = `#/apps/${encodeURIComponent(r.name)}/domains`;
+    } catch (err) { toast(err.message); }
+  };
+  box.querySelector("#add").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api(`${base}/domains`, { method: "POST", body: { host: e.target.host.value } });
+      toast(r.ready ? "Domain connected" : "Added. Now point its DNS to your server.");
+      domains(box, base, app);
+    } catch (err) { toast(err.message); }
+  };
+  box.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
+    if (!confirm(`Remove ${b.dataset.del}?`)) return;
+    try { await api(`${base}/domains/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Removed"); domains(box, base, app); }
+    catch (err) { toast(err.message); }
+  }));
+
+  // Check DNS again every 15 seconds while a domain is waiting.
+  if (d.custom.some((x) => !x.ready)) {
+    const timer = setTimeout(() => box.isConnected && domains(box, base, app), 15000);
+    box.stop = () => clearTimeout(timer);
+  }
 }
 
 // Each version is a collapsible row. Opening it loads its build log.

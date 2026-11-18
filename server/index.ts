@@ -3,11 +3,14 @@ import { serve } from "@hono/node-server";
 import { app } from "./api/routes.ts";
 import { config } from "./lib/config.ts";
 import { syncRoutes } from "./deploy/route.ts";
+import { startScheduler } from "./crons/index.ts";
 
 serve({ fetch: app.fetch, port: config.port, hostname: "0.0.0.0" });
 console.log(`Deploy Boat running on :${config.port}`);
 console.log(`Dashboard: https://${config.dashboardHost}`);
 console.log("Token:     sudo cat /var/lib/deployboat/token");
+
+startScheduler();
 
 // Caddy may still be starting, so keep trying for a minute.
 for (let i = 1; i <= 30; i++) {

@@ -5,6 +5,9 @@ import { containerName, start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
 import { renameServices } from "../services/index.ts";
 import "./git.ts"; // makes sure the git table exists
+import "../lib/domains.ts"; // and the domains table
+import "../lib/share.ts"; // and the share table
+import { removeCrons } from "../crons/index.ts";
 
 // "running", "exited", "restarting"… or "missing" if there's no container.
 export const containerState = (app: string) =>
@@ -38,6 +41,9 @@ export async function remove(app: string) {
   db.prepare("DELETE FROM deploys WHERE app = ?").run(app);
   db.prepare("DELETE FROM env WHERE app = ?").run(app);
   db.prepare("DELETE FROM git WHERE app = ?").run(app);
+  db.prepare("DELETE FROM domains WHERE app = ?").run(app);
+  db.prepare("DELETE FROM share WHERE app = ?").run(app);
+  removeCrons(app);
   await syncRoutes();
 }
 
@@ -51,6 +57,9 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("UPDATE deploys SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE env SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE git SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE domains SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE share SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE crons SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE aliases SET name = ? WHERE name = ?").run(newName, oldName);
   db.prepare("DELETE FROM aliases WHERE old = ?").run(newName);
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);

@@ -8,7 +8,12 @@ import { filesHost, bucketName, usage } from "../services/files/index.ts";
 import { tables } from "../services/postgres/index.ts";
 import { getGit } from "../deploy/git.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
-import { resolveName, isStopped } from "../lib/db.ts";
+import { resolveName, isStopped, displayName } from "../lib/db.ts";
+import { domainsOf, domainOwner, addDomain, removeDomain, validHost, dnsReady } from "../lib/domains.ts";
+import { syncRoutes } from "../deploy/route.ts";
+import { config } from "../lib/config.ts";
+import { share } from "./share.ts";
+import { crons } from "./crons.ts";
 
 export const apps = new Hono();
 
@@ -24,10 +29,15 @@ apps.use("/:name/*", async (c, next) => {
   await next();
 });
 
+// Share and Crons pages live in their own files.
+apps.route("/", share);
+apps.route("/", crons);
+
 apps.get("/", async (c) => {
   const rows = db.prepare("SELECT name FROM apps ORDER BY name").all() as { name: string }[];
   const list = await Promise.all(rows.map(async ({ name }) => ({
     name,
+    displayName: displayName(name),
     url: appUrl(name),
     state: await containerState(name),
     building: isBusy(name),
@@ -46,6 +56,7 @@ apps.get("/:name", async (c) => {
   const deploys = rows.map(({ image: img, ...d }) => ({ ...d, current: !!img && img === image, canActivate: !!img && d.status === "live" }));
   return c.json({
     name,
+    displayName: displayName(name),
     url: appUrl(name),
     filesUrl: `https://${filesHost(name)}`,
     state: await containerState(name),
@@ -151,4 +162,36 @@ apps.post("/:name/stop", async (c) => {
 apps.post("/:name/start", async (c) => {
   try { await resume(c.req.param("name")); return c.json({ ok: true }); }
   catch (e) { return c.json({ error: (e as Error).message }, 400); }
+});
+
+// Free-text name for the dashboard. Doesn't change the address.
+apps.put("/:name/display-name", async (c) => {
+  const { displayName: raw } = await c.req.json().catch(() => ({}));
+  const value = String(raw ?? "").trim().slice(0, 60);
+  db.prepare("UPDATE apps SET display_name = ? WHERE name = ?").run(value || null, c.req.param("name"));
+  return c.json({ ok: true });
+});
+
+apps.get("/:name/domains", async (c) => {
+  const name = c.req.param("name");
+  const custom = await Promise.all(domainsOf(name).map(async (host) => ({ host, ready: await dnsReady(host) })));
+  return c.json({ address: appUrl(name), baseDomain: config.baseDomain, ip: config.publicIp, custom });
+});
+
+apps.post("/:name/domains", async (c) => {
+  const name = c.req.param("name");
+  const { host: raw } = await c.req.json().catch(() => ({}));
+  const host = String(raw ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  if (!validHost(host)) return c.json({ error: "That doesn't look like a domain. Example: myshop.com or www.myshop.com" }, 400);
+  const owner = domainOwner(host);
+  if (owner) return c.json({ error: owner === name ? "Already added." : `This domain is used by ${displayName(owner)}.` }, 409);
+  addDomain(name, host);
+  await syncRoutes();
+  return c.json({ ok: true, ready: await dnsReady(host) });
+});
+
+apps.delete("/:name/domains/:host", async (c) => {
+  removeDomain(c.req.param("name"), c.req.param("host"));
+  await syncRoutes();
+  return c.json({ ok: true });
 });

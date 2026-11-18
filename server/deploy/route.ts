@@ -8,10 +8,12 @@ import { db } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName } from "./run.ts";
 import { filesHost, webUpstream } from "../services/files/index.ts";
+import { domainsOf } from "../lib/domains.ts";
+import { getShare } from "../lib/share.ts";
 
-// Send requests for `host` to `dial`. Optionally rewrite the Host header.
-const route = (host: string, dial: string, hostHeader?: string) => ({
-  match: [{ host: [host] }],
+// Send requests for `hosts` to `dial`. Optionally rewrite the Host header.
+const route = (hosts: string | string[], dial: string, hostHeader?: string) => ({
+  match: [{ host: [hosts].flat() }],
   handle: [{
     handler: "reverse_proxy",
     upstreams: [{ dial }],
@@ -19,11 +21,48 @@ const route = (host: string, dial: string, hostHeader?: string) => ({
   }],
 });
 
+// Routes for one app. Password-protected apps get three:
+//   1. ?share=<token>  → set a cookie and redirect (the private link)
+//   2. has that cookie → straight to the app
+//   3. everyone else   → username/password prompt, then the app
+function appRoutes(app: string) {
+  const hosts = [`${app}.${config.baseDomain}`, ...domainsOf(app)];
+  const proxy = { handler: "reverse_proxy", upstreams: [{ dial: `${containerName(app)}:3000` }] };
+  const s = getShare(app);
+  if (s.mode !== "password" || !s.password_hash || !s.token) return [{ match: [{ host: hosts }], handle: [proxy], terminal: true }];
+
+  const cookie = `deployboat_share=${s.token}`;
+  return [
+    {
+      match: [{ host: hosts, query: { share: [s.token] } }],
+      handle: [{
+        handler: "static_response",
+        status_code: 302,
+        headers: {
+          Location: ["{http.request.uri.path}"],
+          "Set-Cookie": [`${cookie}; Path=/; Max-Age=2592000; HttpOnly; Secure; SameSite=Lax`],
+        },
+      }],
+      terminal: true,
+    },
+    { match: [{ host: hosts, header: { Cookie: [`*${cookie}*`] } }], handle: [proxy], terminal: true },
+    {
+      match: [{ host: hosts }],
+      handle: [
+        { handler: "authentication", providers: { http_basic: { realm: "Private site", accounts: [{ username: s.username, password: s.password_hash }] } } },
+        proxy,
+      ],
+      terminal: true,
+    },
+  ];
+}
+
 export async function syncRoutes() {
   const apps = db.prepare("SELECT name FROM apps").all() as { name: string }[];
   const routes = [
     route(config.dashboardHost, `host.docker.internal:${config.port}`),
-    ...apps.map((a) => route(`${a.name}.${config.baseDomain}`, `${containerName(a.name)}:3000`)),
+    // Default address + custom domains, with password protection if it's on.
+    ...apps.flatMap((a) => appRoutes(a.name)),
     ...apps.map((a) => route(filesHost(a.name), webUpstream.dial, webUpstream.host(a.name))),
   ];
 

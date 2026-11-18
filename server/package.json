@@ -6,9 +6,12 @@
     "start": "node index.ts",
     "dev": "node --watch index.ts"
   },
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "croner": "^9.0.0"
   }
 }

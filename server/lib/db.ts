@@ -33,3 +33,8 @@ export const setStopped = (app: string, stopped: boolean) =>
   db.prepare("UPDATE apps SET stopped = ? WHERE name = ?").run(stopped ? 1 : 0, app);
 export const isStopped = (app: string) =>
   !!(db.prepare("SELECT stopped FROM apps WHERE name = ?").get(app) as { stopped: number } | undefined)?.stopped;
+
+// Added later: a free-text name shown in the dashboard. The app's address uses `name`.
+try { db.exec("ALTER TABLE apps ADD COLUMN display_name TEXT"); } catch { /* already there */ }
+export const displayName = (app: string) =>
+  (db.prepare("SELECT display_name FROM apps WHERE name = ?").get(app) as { display_name: string | null } | undefined)?.display_name || app;

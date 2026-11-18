@@ -22,7 +22,7 @@ function card(a) {
   const s = statusOf(a);
   return `
     <a class="card app" href="#/apps/${encodeURIComponent(a.name)}">
-      <b>${esc(a.name)}</b>
+      <b>${esc(a.displayName)}</b>
       <div class="url">${esc(a.url.replace("https://", ""))}</div>
       <div class="row spread"><span class="status ${s}">${s}</span><span class="muted">${timeAgo(a.lastDeploy?.created_at)}</span></div>
     </a>`;
