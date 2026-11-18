@@ -1,32 +1,52 @@
-// One app: Overview, Deploys, Logs, Variables.
+// One app. The sidebar picks the section; each section is a small function below.
 import { api, esc, timeAgo, statusOf, icon, toast, copy } from "../app.js";
 
-const TABS = [
-  ["overview", "Overview", "box"],
-  ["deploys", "Deploys", "list"],
+// [id, label, icon, soon?] — the sidebar is built from this list.
+export const SECTIONS = [
+  ["overview", "Overview", "home"],
+  ["versions", "Versions", "history"],
   ["logs", "Logs", "term"],
   ["variables", "Variables", "key"],
+  ["database", "Database", "db"],
+  ["storage", "Storage", "folder"],
+  ["domains", "Domains", "globe", true],
+  ["share", "Share", "share", true],
+  ["crons", "Crons", "clock", true],
 ];
 
-export async function appScreen(view, name, tab) {
+export async function appScreen(view, name, section) {
   const app = await api(`/api/apps/${encodeURIComponent(name)}`);
   const s = statusOf(app);
+  const title = SECTIONS.find(([id]) => id === section)?.[1] ?? "Overview";
   view.innerHTML = `
-    <a href="#/" class="btn" style="border:0;padding-left:0;margin-top:8px">${icon("back")} Apps</a>
     <div class="row spread head">
-      <div class="row"><h1>${esc(name)}</h1><span class="status ${s}">${s}</span></div>
-      <a class="btn" href="${esc(app.url)}" target="_blank">${icon("external")} Open</a>
+      <div><div class="muted" style="font-size:13px">${esc(name)}</div>
+        <div class="row"><h1>${title}</h1><span class="status ${s}">${s}</span></div></div>
+      <a class="btn" href="${esc(app.url)}" target="_blank">${icon("external")} Open site</a>
     </div>
-    <div class="tabs">${TABS.map(([id, label, ic]) =>
-      `<a href="#/apps/${encodeURIComponent(name)}/${id}" class="${id === tab ? "on" : ""}">${icon(ic)}${label}</a>`).join("")}</div>
-    <div id="tab"></div>`;
+    <div id="section"></div>`;
 
-  const box = view.querySelector("#tab");
+  const box = view.querySelector("#section");
   const base = `/api/apps/${encodeURIComponent(name)}`;
-  if (tab === "deploys") return deploys(box, base, app);
-  if (tab === "logs") return logs(box, base);
-  if (tab === "variables") return variables(box, base);
-  return overview(box, base, app);
+  const show = { overview, versions, logs, variables, database, storage }[section] ?? overview;
+  return show(box, base, app);
+}
+
+// A label + value row with a copy button. Hidden values show dots until "Show".
+function field(label, value, { secret = false } = {}) {
+  if (!value) return `<dt>${label}</dt><dd class="muted">—</dd>`;
+  return `<dt>${label}</dt><dd class="row" style="gap:8px;flex-wrap:nowrap">
+    <span class="grow secret" ${secret ? `data-val="${esc(value)}"` : ""}>${secret ? "••••••••" : esc(value)}</span>
+    ${secret ? `<button class="btn" data-show>Show</button>` : ""}
+    <button class="btn" data-copy="${esc(value)}">${icon("copy")}</button></dd>`;
+}
+function wireFields(box) {
+  box.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => copy(b.dataset.copy)));
+  box.querySelectorAll("[data-show]").forEach((b) => (b.onclick = () => {
+    const span = b.previousElementSibling, hidden = span.textContent.startsWith("•");
+    span.textContent = hidden ? span.dataset.val : "••••••••";
+    b.textContent = hidden ? "Hide" : "Show";
+  }));
 }
 
 function overview(box, base, app) {
@@ -45,10 +65,10 @@ function overview(box, base, app) {
     </div>`;
 
   box.querySelector("#restart").onclick = async (e) => {
-    e.target.disabled = true;
+    e.currentTarget.disabled = true;
     try { await api(`${base}/restart`, { method: "POST" }); toast("Restarted"); }
     catch (err) { toast(err.message); }
-    e.target.disabled = false;
+    box.querySelector("#restart").disabled = false;
   };
   box.querySelector("#delete").onclick = async () => {
     if (!confirm(`Delete ${app.name}? The site goes offline. Its database and files are kept.`)) return;
@@ -57,24 +77,35 @@ function overview(box, base, app) {
   };
 }
 
-function deploys(box, base, app) {
-  if (!app.deploys.length) { box.innerHTML = `<div class="card pad muted">No deploys yet.</div>`; return; }
+function versions(box, base, app) {
+  if (!app.deploys.length) { box.innerHTML = `<div class="card pad muted">No versions yet.</div>`; return; }
   box.innerHTML = `
     <div class="card list">${app.deploys.map((d) => `
-      <button class="item" data-id="${d.id}">
-        <span class="status ${d.status === "live" ? "live" : d.status}">${esc(d.status)}</span>
-        <span class="grow muted">#${d.id}</span>
+      <div>
+        <span class="status ${esc(d.status)}">${esc(d.status)}</span>
+        <span class="grow">Version #${d.id} ${d.current ? `<span class="badge">Running</span>` : ""}</span>
         <span class="muted">${timeAgo(d.created_at)}</span>
-      </button>`).join("")}
+        <button class="btn" data-log="${d.id}">Log</button>
+        ${d.canActivate && !d.current ? `<button class="btn" data-use="${d.id}">${icon("history")} Roll back</button>` : ""}
+      </div>`).join("")}
     </div>
     <pre class="log" id="deploylog" style="margin-top:14px" hidden></pre>`;
 
   const pre = box.querySelector("#deploylog");
-  box.querySelectorAll("[data-id]").forEach((b) => (b.onclick = async () => {
-    const d = await api(`${base}/deploys/${b.dataset.id}`);
+  box.querySelectorAll("[data-log]").forEach((b) => (b.onclick = async () => {
+    const d = await api(`${base}/deploys/${b.dataset.log}`);
     pre.hidden = false;
     pre.textContent = d.log || "(empty log)";
     pre.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }));
+  box.querySelectorAll("[data-use]").forEach((b) => (b.onclick = async () => {
+    if (!confirm(`Switch the live site to version #${b.dataset.use}?`)) return;
+    b.disabled = true;
+    try {
+      await api(`${base}/versions/${b.dataset.use}/activate`, { method: "POST" });
+      toast(`Now running version #${b.dataset.use}`);
+      versions(box, base, await api(base));
+    } catch (err) { toast(err.message); b.disabled = false; }
   }));
 }
 
@@ -108,11 +139,12 @@ async function variables(box, base) {
         <span class="grow secret muted" data-val="${esc(v.value)}">••••••••</span>
         <button class="btn" data-show>Show</button>
         <button class="btn" data-copy="${esc(v.value)}">${icon("copy")}</button>
-        ${v.builtin ? `<span class="lock" title="Managed by Deploy Boat">${icon("lock")}</span>`
+        ${v.builtin ? `<span class="muted" title="Managed by Deploy Boat">${icon("lock")}</span>`
                     : `<button class="btn danger" data-del="${esc(v.key)}">${icon("trash")}</button>`}
       </div>`).join("") || `<div class="muted">No variables yet.</div>`}
     </div>`;
 
+  wireFields(box);
   const form = box.querySelector("#add");
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -121,15 +153,51 @@ async function variables(box, base) {
       toast("Saved"); variables(box, base);
     } catch (err) { toast(err.message); }
   };
-  box.querySelectorAll("[data-show]").forEach((b) => (b.onclick = () => {
-    const span = b.previousElementSibling, hidden = span.textContent.startsWith("•");
-    span.textContent = hidden ? span.dataset.val : "••••••••";
-    b.textContent = hidden ? "Hide" : "Show";
-  }));
-  box.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => copy(b.dataset.copy)));
   box.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
     if (!confirm(`Remove ${b.dataset.del}? The app will restart.`)) return;
     try { await api(`${base}/env/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Removed"); variables(box, base); }
     catch (err) { toast(err.message); }
   }));
+}
+
+async function database(box, base) {
+  const db = await api(`${base}/database`);
+  const rows = db.tables.reduce((n, t) => n + t.rows, 0);
+  box.innerHTML = `
+    <div class="stats">
+      <div class="card stat"><b>${db.tables.length}</b><span>tables</span></div>
+      <div class="card stat"><b>${rows.toLocaleString()}</b><span>rows (approx.)</span></div>
+      <div class="card stat"><b>PostgreSQL 17</b><span>engine</span></div>
+    </div>
+    <div class="card pad" style="margin-bottom:14px">
+      <dl class="info">${field("DATABASE_URL", db.url, { secret: true })}</dl>
+      <p class="muted" style="font-size:13px;margin-top:10px">Your app already has this as <code>DATABASE_URL</code>. Only reachable from apps on this server.</p>
+    </div>
+    <div class="card list">${db.tables.map((t) => `
+      <div><span>${icon("db")}</span><code class="grow">${esc(t.table)}</code><span class="muted">${t.rows.toLocaleString()} rows</span></div>`).join("")
+      || `<div class="muted">No tables yet. They appear here when your app creates them.</div>`}
+    </div>`;
+  wireFields(box);
+}
+
+async function storage(box, base) {
+  const s = await api(`${base}/storage`);
+  box.innerHTML = `
+    <div class="stats">
+      <div class="card stat"><b>${s.objects.toLocaleString()}</b><span>files</span></div>
+      <div class="card stat"><b>${esc(s.size)}</b><span>used</span></div>
+      <div class="card stat"><b>S3</b><span>compatible</span></div>
+    </div>
+    <div class="card pad">
+      <dl class="info">
+        ${field("Public URL", s.publicUrl)}
+        ${field("Bucket", s.bucket)}
+        ${field("Endpoint", s.endpoint)}
+        ${field("Access key", s.accessKey)}
+        ${field("Secret key", s.secretKey, { secret: true })}
+      </dl>
+      <p class="muted" style="font-size:13px;margin-top:12px">Your app already has these as <code>S3_*</code> variables. Uploaded files are public at
+        <code>${esc(s.publicUrl)}/&lt;file&gt;</code>. In S3 SDKs set <code>forcePathStyle: true</code>.</p>
+    </div>`;
+  wireFields(box);
 }

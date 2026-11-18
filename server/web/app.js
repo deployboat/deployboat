@@ -1,7 +1,7 @@
 // Dashboard entry: a tiny router plus helpers every screen uses.
 import { loginScreen } from "./screens/login.js";
 import { appsScreen } from "./screens/apps.js";
-import { appScreen } from "./screens/app.js";
+import { appScreen, SECTIONS } from "./screens/app.js";
 import { settingsScreen } from "./screens/settings.js";
 
 const view = document.getElementById("view");
@@ -61,6 +61,14 @@ const paths = {
   key: "M15 7a4 4 0 11-4 4M11 11L3 19v2h3l1-1v-2h2v-2h2l1.5-1.5",
   lock: "M5 11h14v10H5zM8 11V7a4 4 0 018 0v4",
   rocket: "M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2M9 15l-3-3c1-4 5-8 13-9-1 8-5 12-9 13z",
+  home: "M3 11l9-8 9 8M5 9v12h14V9",
+  history: "M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8M3 3v5h5M12 7v5l3 2",
+  db: "M4 5c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+  folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z",
+  globe: "M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18",
+  share: "M18 8a3 3 0 100-6 3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4",
+  clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
+  gear: "M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1",
 };
 export const icon = (n) => `<svg class="i" viewBox="0 0 24 24"><path d="${paths[n]}"/></svg>`;
 
@@ -73,9 +81,31 @@ export async function copy(text) {
 let cleanup = () => {};
 
 function showLogin() {
-  cleanup(); cleanup = () => {};
+  cleanup(); cleanup = () => {}; current++;
   document.getElementById("top").hidden = true;
   loginScreen(view, () => { location.hash = "#/"; render(); });
+}
+
+let current = 0;
+
+// Sidebar: main menu, or the app menu when you're inside an app.
+function drawNav(page, appName, section) {
+  const nav = document.getElementById("nav");
+  const link = (href, ic, label, on) => `<a href="${href}" class="${on ? "on" : ""}">${icon(ic)}${label}</a>`;
+
+  if (page === "apps" && appName) {
+    const base = `#/apps/${encodeURIComponent(appName)}`;
+    nav.innerHTML = `
+      <a href="#/" class="back">${icon("back")}All apps</a>
+      <div class="navtitle">${esc(appName)}</div>
+      ${SECTIONS.map(([id, label, ic, soon]) => soon
+        ? `<span class="soon">${icon(ic)}${label}<em>Soon</em></span>`
+        : link(`${base}/${id}`, ic, label, id === section)).join("")}`;
+  } else {
+    nav.innerHTML = `
+      ${link("#/", "box", "Apps", page !== "settings")}
+      ${link("#/settings", "gear", "Settings", page === "settings")}`;
+  }
 }
 
 async function render() {
@@ -84,15 +114,23 @@ async function render() {
   const hash = location.hash.slice(1) || "/";
   const [, page, name, tab] = hash.split("/");
 
-  document.querySelectorAll("[data-nav]").forEach((a) =>
-    a.classList.toggle("on", a.dataset.nav === (page === "settings" ? "settings" : "apps")));
+  drawNav(page, name && decodeURIComponent(name), tab || "overview");
+
+  // Each page draws into its own box. When you navigate away, the old box is
+  // removed, so slow loads or timers from the old page can't overwrite the new one.
+  const id = ++current;
+  const box = document.createElement("div");
+  view.replaceChildren(box);
 
   try {
-    if (page === "settings") await settingsScreen(view);
-    else if (page === "apps" && name) cleanup = (await appScreen(view, decodeURIComponent(name), tab || "overview")) ?? (() => {});
-    else cleanup = (await appsScreen(view)) ?? (() => {});
+    let stop;
+    if (page === "settings") stop = await settingsScreen(box);
+    else if (page === "apps" && name) stop = await appScreen(box, decodeURIComponent(name), tab || "overview");
+    else stop = await appsScreen(box);
+    if (id === current) cleanup = stop ?? (() => {});
+    else stop?.(); // we already moved on: stop its timers right away
   } catch (e) {
-    if (e.message !== "Logged out") view.innerHTML = `<div class="card pad">${esc(e.message)}</div>`;
+    if (id === current && e.message !== "Logged out") box.innerHTML = `<div class="card pad">${esc(e.message)}</div>`;
   }
 }
 

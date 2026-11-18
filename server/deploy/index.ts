@@ -19,6 +19,7 @@ export async function deploy(name: string, srcDir: string, log: (l: string) => v
 
   try {
     const image = await build(name, srcDir, logAndSave);
+    db.prepare("UPDATE deploys SET image = ? WHERE id = ?").run(image, id);
     await provisionServices(name, logAndSave);
     await start(name, image, logAndSave);
     await syncRoutes().catch(() => {

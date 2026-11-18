@@ -10,18 +10,19 @@
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <header class="top" id="top" hidden>
-    <a href="#/" class="logo">
-      <svg viewBox="0 0 32 32"><path d="M16 4v18" stroke="currentColor" stroke-width="2"/><path d="M17 5l9 14h-9z" fill="var(--accent)"/><path d="M5 23h22l-4 5H9z" fill="currentColor"/></svg>
-      Deploy Boat
-    </a>
-    <nav>
-      <a href="#/" data-nav="apps">Apps</a>
-      <a href="#/settings" data-nav="settings">Settings</a>
-      <button class="link" id="logout">Log out</button>
-    </nav>
-  </header>
-  <main id="view"></main>
+  <div class="layout">
+    <aside class="side" id="top" hidden>
+      <a href="#/" class="logo">
+        <svg viewBox="0 0 32 32"><path d="M16 4v18" stroke="currentColor" stroke-width="2"/><path d="M17 5l9 14h-9z" fill="var(--accent)"/><path d="M5 23h22l-4 5H9z" fill="currentColor"/></svg>
+        Deploy Boat
+      </a>
+      <nav id="nav"></nav>
+      <button class="navlink" id="logout">
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>Log out
+      </button>
+    </aside>
+    <main id="view"></main>
+  </div>
   <div id="toast" class="toast" hidden></div>
   <script type="module" src="/app.js"></script>
 </body>

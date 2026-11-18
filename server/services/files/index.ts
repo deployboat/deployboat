@@ -112,3 +112,12 @@ export async function provision(app: string, log: (l: string) => void) {
   };
   for (const [k, v] of Object.entries(vars)) setEnv(app, k, v);
 }
+
+// Size and file count of the app's bucket (for the dashboard).
+export async function usage(app: string) {
+  const out = await garage("bucket", "info", bucketName(app)).catch(() => "");
+  return {
+    size: out.match(/Size:\s*([^\n(]+)/)?.[1]?.trim() ?? "0 B",
+    objects: Number(out.match(/Objects:\s*(\d+)/)?.[1] ?? 0),
+  };
+}

@@ -3,8 +3,9 @@ import { Hono } from "hono";
 import { db } from "../lib/db.ts";
 import { getEnv, setEnv, deleteEnv, isBuiltin } from "../lib/env.ts";
 import { appUrl } from "../deploy/index.ts";
-import { containerState, appLogs, restart, remove } from "../deploy/manage.ts";
-import { filesHost } from "../services/files/index.ts";
+import { containerState, appLogs, restart, remove, currentImage, activate } from "../deploy/manage.ts";
+import { filesHost, bucketName, usage } from "../services/files/index.ts";
+import { tables } from "../services/postgres/index.ts";
 import { isBusy } from "../lib/lock.ts";
 
 export const apps = new Hono();
@@ -36,7 +37,10 @@ apps.get("/", async (c) => {
 apps.get("/:name", async (c) => {
   const name = c.req.param("name");
   if (!exists(name)) return c.json({ error: "App not found." }, 404);
-  const deploys = db.prepare("SELECT id, status, created_at FROM deploys WHERE app = ? ORDER BY id DESC LIMIT 30").all(name);
+  const image = await currentImage(name);
+  const rows = db.prepare("SELECT id, status, image, created_at FROM deploys WHERE app = ? ORDER BY id DESC LIMIT 30").all(name) as (Deploy & { image: string | null })[];
+  // Don't send image names to the browser; just say which one is running.
+  const deploys = rows.map(({ image: img, ...d }) => ({ ...d, current: !!img && img === image, canActivate: !!img && d.status === "live" }));
   return c.json({
     name,
     url: appUrl(name),
@@ -90,4 +94,31 @@ apps.delete("/:name", async (c) => {
   if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
   await remove(name);
   return c.json({ ok: true });
+});
+
+// Switch to an older version.
+apps.post("/:name/versions/:id/activate", async (c) => {
+  const { name, id } = c.req.param();
+  const row = db.prepare("SELECT image FROM deploys WHERE app = ? AND id = ?").get(name, Number(id)) as { image: string | null } | undefined;
+  if (!row?.image) return c.json({ error: "This version can't be restored." }, 400);
+  try { await activate(name, row.image); return c.json({ ok: true }); }
+  catch (e) { return c.json({ error: (e as Error).message }, 400); }
+});
+
+apps.get("/:name/database", async (c) => {
+  const name = c.req.param("name");
+  return c.json({ url: getEnv(name).DATABASE_URL ?? null, tables: await tables(name) });
+});
+
+apps.get("/:name/storage", async (c) => {
+  const name = c.req.param("name");
+  const env = getEnv(name);
+  return c.json({
+    bucket: bucketName(name),
+    publicUrl: `https://${filesHost(name)}`,
+    endpoint: env.S3_ENDPOINT ?? null,
+    accessKey: env.S3_ACCESS_KEY ?? null,
+    secretKey: env.S3_SECRET_KEY ?? null,
+    ...(await usage(name)),
+  });
 });

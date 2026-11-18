@@ -11,10 +11,21 @@ export const containerState = (app: string) =>
 export const appLogs = (app: string, lines = 200) =>
   run("docker", ["logs", "--tail", String(lines), "--timestamps", containerName(app)]).catch(() => "");
 
+// The Docker image the app is running right now ("" if none).
+export const currentImage = (app: string) =>
+  run("docker", ["inspect", "-f", "{{.Config.Image}}", containerName(app)]).catch(() => "");
+
 // Recreate the container from the same image. Picks up new env vars.
 export async function restart(app: string) {
-  const image = await run("docker", ["inspect", "-f", "{{.Config.Image}}", containerName(app)]).catch(() => "");
+  const image = await currentImage(app);
   if (!image) throw new Error("This app has no running version. Deploy it first.");
+  await start(app, image, () => {});
+}
+
+// Switch the app to an older (or newer) version.
+export async function activate(app: string, image: string) {
+  const exists = await run("docker", ["image", "inspect", image]).then(() => true, () => false);
+  if (!exists) throw new Error("This version was cleaned up and can't be restored.");
   await start(app, image, () => {});
 }
 

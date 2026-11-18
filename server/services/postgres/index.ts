@@ -61,3 +61,14 @@ export async function provision(app: string, log: (l: string) => void) {
   }
   setEnv(app, "DATABASE_URL", `postgres://${name}:${password}@${CONTAINER}:5432/${name}`);
 }
+
+// Tables in the app's database with approximate row counts (for the dashboard).
+export async function tables(app: string) {
+  const name = "app_" + app.replace(/-/g, "_");
+  const out = await run("docker", ["exec", CONTAINER, "psql", "-U", "postgres", "-d", name, "-tAc",
+    "SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY relname"]).catch(() => "");
+  return out.split("\n").filter(Boolean).map((l) => {
+    const [table, rows] = l.split("|");
+    return { table, rows: Number(rows) };
+  });
+}

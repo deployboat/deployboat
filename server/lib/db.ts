@@ -18,3 +18,6 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 `);
+
+// Added later: which Docker image each deploy produced (for rollback).
+try { db.exec("ALTER TABLE deploys ADD COLUMN image TEXT"); } catch { /* already there */ }
