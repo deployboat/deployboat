@@ -1,3 +1,4 @@
 node_modules/
 .deployboat.json
 plan/
+.DS_Store

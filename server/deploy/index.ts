@@ -1,7 +1,8 @@
-// A deploy is 3 steps: build → start → route. Read the files in that order.
+// A deploy is 4 steps: build → services → start → route. Read the files in that order.
 import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
 import { build } from "./build.ts";
+import { provisionServices } from "../services/index.ts";
 import { start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
 
@@ -18,8 +19,11 @@ export async function deploy(name: string, srcDir: string, log: (l: string) => v
 
   try {
     const image = await build(name, srcDir, logAndSave);
+    await provisionServices(name, logAndSave);
     await start(name, image, logAndSave);
-    await syncRoutes();
+    await syncRoutes().catch(() => {
+      throw new Error("Your app is running but we couldn't publish its address. Try deploying again.");
+    });
     finish("live");
     return appUrl(name);
   } catch (e) {

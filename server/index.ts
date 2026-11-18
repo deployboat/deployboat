@@ -7,7 +7,7 @@ import { syncRoutes } from "./deploy/route.ts";
 serve({ fetch: app.fetch, port: config.port, hostname: "0.0.0.0" });
 console.log(`Deploy Boat running on :${config.port}`);
 console.log(`Dashboard: https://${config.dashboardHost}`);
-console.log(`Token:     ${config.token}`);
+console.log("Token:     sudo cat /var/lib/deployboat/token");
 
 // Caddy may still be starting, so keep trying for a minute.
 for (let i = 1; i <= 30; i++) {
