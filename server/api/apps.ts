@@ -3,11 +3,12 @@ import { Hono } from "hono";
 import { db } from "../lib/db.ts";
 import { getEnv, setEnv, deleteEnv, isBuiltin } from "../lib/env.ts";
 import { appUrl } from "../deploy/index.ts";
-import { containerState, appLogs, restart, remove, currentImage, activate, rename } from "../deploy/manage.ts";
+import { containerState, appLogs, restart, remove, currentImage, activate, rename, stop, resume } from "../deploy/manage.ts";
 import { filesHost, bucketName, usage } from "../services/files/index.ts";
 import { tables } from "../services/postgres/index.ts";
+import { getGit } from "../deploy/git.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
-import { resolveName } from "../lib/db.ts";
+import { resolveName, isStopped } from "../lib/db.ts";
 
 export const apps = new Hono();
 
@@ -30,6 +31,7 @@ apps.get("/", async (c) => {
     url: appUrl(name),
     state: await containerState(name),
     building: isBusy(name),
+    stopped: isStopped(name),
     lastDeploy: lastDeploy(name) ?? null,
   })));
   return c.json(list);
@@ -48,6 +50,8 @@ apps.get("/:name", async (c) => {
     filesUrl: `https://${filesHost(name)}`,
     state: await containerState(name),
     building: isBusy(name),
+    stopped: isStopped(name),
+    git: getGit(name)?.repo ? { repo: getGit(name)!.repo, branch: getGit(name)!.branch } : null,
     deploys,
   });
 });
@@ -137,4 +141,14 @@ apps.post("/:name/rename", async (c) => {
   try { await rename(name, newName); return c.json({ ok: true, name: newName }); }
   catch (e) { return c.json({ error: `Rename failed: ${(e as Error).message}` }, 500); }
   finally { unlock(name); }
+});
+
+apps.post("/:name/stop", async (c) => {
+  try { await stop(c.req.param("name")); return c.json({ ok: true }); }
+  catch { return c.json({ error: "Couldn't stop the app. Is it running?" }, 400); }
+});
+
+apps.post("/:name/start", async (c) => {
+  try { await resume(c.req.param("name")); return c.json({ ok: true }); }
+  catch (e) { return c.json({ error: (e as Error).message }, 400); }
 });

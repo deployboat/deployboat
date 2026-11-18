@@ -1,9 +1,10 @@
 // Things you do to an app after it's deployed: status, logs, restart, delete.
-import { db } from "../lib/db.ts";
+import { db, setStopped } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName, start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
 import { renameServices } from "../services/index.ts";
+import "./git.ts"; // makes sure the git table exists
 
 // "running", "exited", "restarting"… or "missing" if there's no container.
 export const containerState = (app: string) =>
@@ -36,6 +37,7 @@ export async function remove(app: string) {
   db.prepare("DELETE FROM apps WHERE name = ?").run(app);
   db.prepare("DELETE FROM deploys WHERE app = ?").run(app);
   db.prepare("DELETE FROM env WHERE app = ?").run(app);
+  db.prepare("DELETE FROM git WHERE app = ?").run(app);
   await syncRoutes();
 }
 
@@ -48,6 +50,7 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("UPDATE apps SET name = ? WHERE name = ?").run(newName, oldName);
   db.prepare("UPDATE deploys SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE env SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE git SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE aliases SET name = ? WHERE name = ?").run(newName, oldName);
   db.prepare("DELETE FROM aliases WHERE old = ?").run(newName);
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);
@@ -55,4 +58,15 @@ export async function rename(oldName: string, newName: string) {
   await renameServices(oldName, newName);
   if (image) await start(newName, image, () => {});
   await syncRoutes();
+}
+
+// Stop the app. It stays stopped (even after a server reboot) until you start it.
+export async function stop(app: string) {
+  await run("docker", ["stop", containerName(app)]);
+  setStopped(app, true);
+}
+
+export async function resume(app: string) {
+  await run("docker", ["start", containerName(app)]).catch(() => restart(app));
+  setStopped(app, false);
 }

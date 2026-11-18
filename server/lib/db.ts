@@ -26,3 +26,10 @@ try { db.exec("ALTER TABLE deploys ADD COLUMN image TEXT"); } catch { /* already
 db.exec("CREATE TABLE IF NOT EXISTS aliases (old TEXT PRIMARY KEY, name TEXT NOT NULL)");
 export const resolveName = (name: string) =>
   (db.prepare("SELECT name FROM aliases WHERE old = ?").get(name) as { name: string } | undefined)?.name ?? name;
+
+// Added later: 1 when the user stopped the app on purpose.
+try { db.exec("ALTER TABLE apps ADD COLUMN stopped INTEGER DEFAULT 0"); } catch { /* already there */ }
+export const setStopped = (app: string, stopped: boolean) =>
+  db.prepare("UPDATE apps SET stopped = ? WHERE name = ?").run(stopped ? 1 : 0, app);
+export const isStopped = (app: string) =>
+  !!(db.prepare("SELECT stopped FROM apps WHERE name = ?").get(app) as { stopped: number } | undefined)?.stopped;

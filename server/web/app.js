@@ -50,6 +50,7 @@ export function timeAgo(sqlDate) {
 // One status for an app: building, live or failed.
 export function statusOf(a) {
   if (a.building) return "building";
+  if (a.stopped) return "stopped";
   if (a.state === "running") return "live";
   return "failed";
 }
@@ -58,6 +59,8 @@ export function statusOf(a) {
 const paths = {
   plus: "M12 5v14M5 12h14",
   copy: "M8 8h12v12H8zM16 8V4H4v12h4",
+  stop: "M6 6h12v12H6z",
+  play: "M7 4l13 8-13 8z",
   restart: "M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8M3 3v5h5",
   trash: "M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3",
   external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
@@ -77,6 +80,8 @@ const paths = {
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
   server: "M3 4h18v7H3zM3 13h18v7H3zM7 7.5h.01M7 16.5h.01",
   chevron: "M9 6l6 6-6 6",
+  sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17v4M17 19h4",
+  git: "M6 3.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM6 15.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM18 6.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM6 8.5v7M18 11.5c0 4-6 3-10 5",
   gear: "M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1",
 };
 export const icon = (n) => `<svg class="i" viewBox="0 0 24 24"><path d="${paths[n]}"/></svg>`;

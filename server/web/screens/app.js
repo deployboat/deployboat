@@ -29,7 +29,8 @@ export async function appScreen(view, name, section) {
   const box = view.querySelector("#section");
   const base = `/api/apps/${encodeURIComponent(name)}`;
   const show = { overview, versions, logs, variables, database, storage }[section] ?? overview;
-  return show(box, base, app);
+  const stop = await show(box, base, app);
+  return () => { stop?.(); box.stop?.(); };
 }
 
 // A label + value row with a copy button. Hidden values show dots until "Show".
@@ -57,6 +58,7 @@ function overview(box, base, app) {
         <dt>Files</dt><dd><a href="${esc(app.filesUrl)}" target="_blank">${esc(app.filesUrl)}</a></dd>
         <dt>Last deploy</dt><dd>${timeAgo(app.deploys[0]?.created_at)}</dd>
         <dt>Container</dt><dd>${esc(app.state)}</dd>
+        ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
       </dl>
     </div>
     <form class="card pad" id="rename" style="margin-top:14px">
@@ -66,6 +68,10 @@ function overview(box, base, app) {
         <button class="btn primary">Rename</button></div>
     </form>
     <div class="row" style="margin-top:14px">
+      ${app.git ? `<button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button>` : ""}
+      ${app.stopped
+        ? `<button class="btn primary" id="toggle">${icon("play")} Start</button>`
+        : `<button class="btn" id="toggle">${icon("stop")} Stop</button>`}
       <button class="btn" id="restart">${icon("restart")} Restart</button>
       <button class="btn danger" id="delete">${icon("trash")} Delete app</button>
     </div>`;
@@ -75,6 +81,24 @@ function overview(box, base, app) {
     try { await api(`${base}/restart`, { method: "POST" }); toast("Restarted"); }
     catch (err) { toast(err.message); }
     box.querySelector("#restart").disabled = false;
+  };
+  box.querySelector("#redeploy")?.addEventListener("click", async (e) => {
+    e.currentTarget.disabled = true;
+    try {
+      await api(`/api/git/redeploy/${encodeURIComponent(app.name)}`, { method: "POST" });
+      toast("Deploy started");
+      location.hash = `#/apps/${encodeURIComponent(app.name)}/versions`;
+    } catch (err) { toast(err.message); }
+  });
+  box.querySelector("#toggle").onclick = async (e) => {
+    const action = app.stopped ? "start" : "stop";
+    if (action === "stop" && !confirm(`Stop ${app.name}? The site goes offline until you start it again.`)) return;
+    e.currentTarget.disabled = true;
+    try {
+      await api(`${base}/${action}`, { method: "POST" });
+      toast(action === "stop" ? "Stopped" : "Started");
+      dispatchEvent(new HashChangeEvent("hashchange")); // redraw page + status
+    } catch (err) { toast(err.message); box.querySelector("#toggle").disabled = false; }
   };
   const form = box.querySelector("#rename");
   form.onsubmit = async (e) => {
@@ -97,6 +121,7 @@ function overview(box, base, app) {
 }
 
 // Each version is a collapsible row. Opening it loads its build log.
+// While a version is building, it stays open and its log updates live.
 function versions(box, base, app) {
   if (!app.deploys.length) { box.innerHTML = `<div class="card pad muted">No versions yet.</div>`; return; }
   box.innerHTML = `<div class="card">${app.deploys.map((d) => `
@@ -115,6 +140,25 @@ function versions(box, base, app) {
         <pre class="log">Loading log…</pre>
       </div>
     </details>`).join("")}</div>`;
+
+  // Live view of a version that's still building.
+  const building = app.deploys.find((d) => d.status === "building");
+  if (building) {
+    const el = box.querySelector(`details[data-id="${building.id}"]`);
+    el.open = true;
+    const pre = el.querySelector("pre");
+    pre.dataset.loaded = "1";
+    const timer = setInterval(async () => {
+      try {
+        const d = await api(`${base}/deploys/${building.id}`);
+        const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
+        pre.textContent = d.log || "Starting…";
+        if (atBottom) pre.scrollTop = pre.scrollHeight;
+        if (d.status !== "building") { clearInterval(timer); versions(box, base, await api(base)); }
+      } catch { clearInterval(timer); }
+    }, 2000);
+    box.stop = () => clearInterval(timer);
+  }
 
   box.querySelectorAll("details.ver").forEach((el) => el.addEventListener("toggle", async () => {
     const pre = el.querySelector("pre");

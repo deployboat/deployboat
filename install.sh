@@ -14,7 +14,7 @@ case "$ID" in ubuntu|debian) ;; *) echo "Only Ubuntu and Debian are supported.";
 
 say "Installing basics"
 apt-get update -qq >/dev/null
-apt-get install -y -qq curl git ca-certificates ufw fail2ban unattended-upgrades >/dev/null 2>&1
+apt-get install -y -qq curl git openssh-client ca-certificates ufw fail2ban unattended-upgrades >/dev/null 2>&1
 
 say "Securing the server"
 ufw allow 22/tcp >/dev/null; ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null

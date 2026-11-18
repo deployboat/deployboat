@@ -9,6 +9,8 @@ import { extract } from "../deploy/extract.ts";
 import { requireLogin, login, logout } from "./auth.ts";
 import { apps } from "./apps.ts";
 import { server } from "./server.ts";
+import { git } from "./git.ts";
+import { agentPrompt } from "./agent.ts";
 import { resolveName } from "../lib/db.ts";
 
 export const app = new Hono();
@@ -21,6 +23,8 @@ app.post("/auth/logout", logout);
 app.use("/api/*", requireLogin);
 app.route("/api/apps", apps);
 app.route("/api/server", server);
+app.route("/api/git", git);
+app.get("/api/agent-prompt", agentPrompt);
 
 app.get("/api/settings", (c) =>
   c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain }),

@@ -2,6 +2,7 @@
 import { run } from "../lib/shell.ts";
 import { config } from "../lib/config.ts";
 import { getEnv } from "../lib/env.ts";
+import { setStopped } from "../lib/db.ts";
 
 export const containerName = (name: string) => `app-${name}`;
 
@@ -20,6 +21,7 @@ export async function start(name: string, image: string, log: (l: string) => voi
       ...envArgs,
       image,
     ]);
+    setStopped(name, false);
   } catch {
     throw new Error("Your app was built but couldn't start. Make sure it listens on the PORT env variable.");
   }
