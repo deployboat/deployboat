@@ -41,7 +41,7 @@ If you have a team of 50 and a Kubernetes cluster, this isn't for you, and that'
 Rent any Ubuntu or Debian server (a $5 VPS is plenty), then run:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/deployboat/deployboat/main/install.sh | sudo bash
+curl -fsSL deployboat.github.io/install.sh | sudo bash
 ```
 
 A few minutes later you get a dashboard link. Your server is already secured:

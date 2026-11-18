@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploy Boat installer (and updater). Ubuntu 22.04 / 24.04 or Debian 12. Run as root:
-#   curl -fsSL https://raw.githubusercontent.com/deployboat/deployboat/main/install.sh | sudo bash
+#   curl -fsSL deployboat.github.io/install.sh | sudo bash
 #
 # Safe to run again: it skips what's already there and updates the rest.
 # Everything the commands print goes to the log file; the screen shows one line per step.
