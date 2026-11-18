@@ -21,6 +21,5 @@ export const config = {
   publicIp,
   baseDomain: process.env.BASE_DOMAIN ?? `${publicIp}.nip.io`,
   dashboardHost: `deployboat.${process.env.BASE_DOMAIN ?? `${publicIp}.nip.io`}`,
-  caddyAdmin: process.env.CADDY_ADMIN ?? "http://127.0.0.1:2019",
   dockerNetwork: "deployboat",
 };

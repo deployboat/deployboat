@@ -1,7 +1,11 @@
 // Step 3: tell Caddy about every app. Caddy handles domains + HTTPS for us.
-// We always send the full config, built from the database. Simple and self-healing.
+// We write the full config to a file (built from the database), then ask Caddy to reload it.
+// Simple, self-healing, and survives reboots.
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
+import { run } from "../lib/shell.ts";
 import { containerName } from "./run.ts";
 
 const route = (host: string, dial: string) => ({
@@ -17,15 +21,13 @@ export async function syncRoutes() {
   ];
 
   const caddyConfig = {
-    // Caddy only accepts admin calls whose Host matches one of these.
-    admin: { listen: "0.0.0.0:2019", origins: ["127.0.0.1:2019", "localhost:2019"] },
     apps: { http: { servers: { main: { listen: [":80", ":443"], routes } } } },
   };
 
-  const res = await fetch(`${config.caddyAdmin}/load`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(caddyConfig),
-  });
-  if (!res.ok) throw new Error(`Caddy said: ${await res.text()}`);
+  // This folder is mounted into the Caddy container as /data.
+  const dir = join(config.dataDir, "caddy");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "config.json"), JSON.stringify(caddyConfig, null, 2));
+
+  await run("docker", ["exec", "caddy", "caddy", "reload", "--config", "/data/config.json"]);
 }

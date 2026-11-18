@@ -49,12 +49,14 @@ docker network inspect deployboat >/dev/null 2>&1 || docker network create deplo
 ufw allow from 172.16.0.0/12 to any port 3000 proto tcp >/dev/null
 docker inspect buildkit >/dev/null 2>&1 || docker run -d --name buildkit --privileged --restart unless-stopped moby/buildkit >/dev/null 2>&1
 mkdir -p /var/lib/deployboat/caddy
-echo '{"admin":{"listen":"0.0.0.0:2019","origins":["127.0.0.1:2019","localhost:2019"]}}' > /var/lib/deployboat/caddy/initial.json
-docker inspect caddy >/dev/null 2>&1 || docker run -d --name caddy --restart unless-stopped \
+[ -f /var/lib/deployboat/caddy/config.json ] || echo '{}' > /var/lib/deployboat/caddy/config.json
+# Always (re)create Caddy so it has the latest settings. Routes live in config.json.
+docker rm -f caddy >/dev/null 2>&1 || true
+docker run -d --name caddy --restart unless-stopped \
   --network deployboat --add-host host.docker.internal:host-gateway \
-  -p 80:80 -p 443:443 -p 127.0.0.1:2019:2019 \
+  -p 80:80 -p 443:443 -p 443:443/udp \
   -v /var/lib/deployboat/caddy:/data \
-  caddy:2 caddy run --config /data/initial.json >/dev/null 2>&1
+  caddy:2 caddy run --config /data/config.json >/dev/null 2>&1
 
 say "Installing Deploy Boat"
 [ -d "$DIR" ] && git -C "$DIR" pull -q || git clone -q "$REPO" "$DIR"
@@ -78,7 +80,8 @@ Restart=always
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now deployboat >/dev/null 2>&1
+systemctl enable deployboat >/dev/null 2>&1
+systemctl restart deployboat
 sleep 2
 
 TOKEN="$(cat /var/lib/deployboat/token)"
