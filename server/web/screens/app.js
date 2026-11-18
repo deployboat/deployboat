@@ -85,7 +85,8 @@ function overview(box, base, app) {
     <div class="card pad">
       <dl class="info">
         <dt>Address</dt><dd><a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></dd>
-        <dt>Files</dt><dd><a href="${esc(app.filesUrl)}" target="_blank">${esc(app.filesUrl)}</a></dd>
+        ${app.filesUrl ? `<dt>Files</dt><dd><a href="${esc(app.filesUrl)}" target="_blank">${esc(app.filesUrl)}</a></dd>` : ""}
+        <dt>Services</dt><dd>${app.services.length ? app.services.map((x) => (x === "database" ? "Database" : "Storage")).join(", ") : `<span class="muted">None. Add a database or storage from the menu.</span>`}</dd>
         <dt>Last deploy</dt><dd>${timeAgo(app.deploys[0]?.created_at)}</dd>
         <dt>Container</dt><dd>${esc(app.state)}</dd>
         ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
@@ -318,7 +319,29 @@ async function variables(box, base) {
   }));
 }
 
-async function database(box, base) {
+// Shown when an app hasn't added a service yet.
+function addServicePage(box, base, service) {
+  const db = service === "database";
+  box.innerHTML = `
+    <div class="card empty">
+      ${icon(db ? "db" : "folder")}
+      <h2>${db ? "No database yet" : "No file storage yet"}</h2>
+      <p class="muted" style="max-width:440px;margin:6px auto 18px">${db
+        ? "Add a PostgreSQL database. Your app gets <code>DATABASE_URL</code> and restarts."
+        : "Add S3-compatible storage for uploads and images. Your app gets <code>S3_*</code> variables and restarts."}</p>
+      <button class="btn primary" id="addsvc">${icon("plus")} ${db ? "Create database" : "Create storage"}</button>
+      <p class="note" style="margin-top:14px">AI agents can add it too: <code>deployboat add ${service}</code></p>
+    </div>`;
+  box.querySelector("#addsvc").onclick = async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true; b.innerHTML = `<span class="spinner" style="width:14px;height:14px"></span> Creating…`;
+    try { await api(`${base}/services/${service}`, { method: "POST" }); toast(db ? "Database created" : "Storage created"); dispatchEvent(new HashChangeEvent("hashchange")); }
+    catch (err) { toast(err.message); b.disabled = false; b.textContent = db ? "Create database" : "Create storage"; }
+  };
+}
+
+async function database(box, base, app) {
+  if (!app.services.includes("database")) return addServicePage(box, base, "database");
   const db = await api(`${base}/database`);
   const rows = db.tables.reduce((n, t) => n + t.rows, 0);
   box.innerHTML = `
@@ -338,7 +361,8 @@ async function database(box, base) {
   wireFields(box);
 }
 
-async function storage(box, base) {
+async function storage(box, base, app) {
+  if (!app.services.includes("storage")) return addServicePage(box, base, "storage");
   const s = await api(`${base}/storage`);
   box.innerHTML = `
     <div class="stats">

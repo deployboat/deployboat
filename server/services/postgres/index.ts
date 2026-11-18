@@ -45,6 +45,9 @@ async function ensureRunning(log: (l: string) => void) {
   throw new Error("The database server didn't start. Try deploying again.");
 }
 
+// Has this app added a database?
+export const enabled = (app: string) => !!getEnv(app).DATABASE_URL;
+
 export async function provision(app: string, log: (l: string) => void) {
   await ensureRunning(log);
 

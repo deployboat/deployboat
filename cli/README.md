@@ -8,12 +8,13 @@ npx deployboat login <dashboard-url> <token>   # once
 npx deployboat deploy                          # in any project folder
 ```
 
-You get a live HTTPS link, plus a database and file storage your app can use right away.
+You get a live HTTPS link. Need a database or file storage? Add `--with database,storage`.
 
 ## Commands
 
 ```
 deployboat deploy [folder]        publish a folder
+deployboat add database|storage   give the app a database or file storage
 deployboat apps                   list your apps
 deployboat status                 this app's status and address
 deployboat logs [--lines 100]     this app's recent output

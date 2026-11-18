@@ -15,6 +15,7 @@ import { config } from "../lib/config.ts";
 import { share } from "./share.ts";
 import { isAdmin } from "./auth.ts";
 import { crons } from "./crons.ts";
+import { enabledServices, addService, isService } from "../services/index.ts";
 
 export const apps = new Hono();
 
@@ -59,7 +60,8 @@ apps.get("/:name", async (c) => {
     name,
     displayName: displayName(name),
     url: appUrl(name),
-    filesUrl: `https://${filesHost(name)}`,
+    services: enabledServices(name),
+    filesUrl: enabledServices(name).includes("storage") ? `https://${filesHost(name)}` : null,
     state: await containerState(name),
     building: isBusy(name),
     stopped: isStopped(name),
@@ -197,4 +199,22 @@ apps.delete("/:name/domains/:host", async (c) => {
   removeDomain(c.req.param("name"), c.req.param("host"));
   await syncRoutes();
   return c.json({ ok: true });
+});
+
+// Add a database or file storage to an app, then restart it so it sees the new variables.
+apps.post("/:name/services/:service", async (c) => {
+  const { name, service } = c.req.param();
+  if (!isService(service)) return c.json({ error: "Use database or storage." }, 400);
+  if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
+  lock(name);
+  try {
+    await addService(name, service);
+    await syncRoutes();
+    await restart(name).catch(() => {}); // fine if it was never deployed
+    return c.json({ ok: true, services: enabledServices(name) });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 500);
+  } finally {
+    unlock(name);
+  }
 });

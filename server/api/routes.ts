@@ -14,6 +14,7 @@ import { git } from "./git.ts";
 import { doctor } from "./doctor.ts";
 import { agentPrompt, agentGuide } from "./agent.ts";
 import { resolveName, db } from "../lib/db.ts";
+import { isService } from "../services/index.ts";
 
 export const app = new Hono();
 
@@ -58,6 +59,11 @@ app.post("/api/deploy/:name", async (c) => {
   if (!c.req.raw.body) return c.json({ error: "No files uploaded." }, 400);
   if (isBusy(name)) return c.json({ error: `${name} is already deploying. Wait for it to finish.` }, 409);
 
+  // ?with=database,storage adds those services on this deploy.
+  const add = (c.req.query("with") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  const bad = add.find((x) => !isService(x));
+  if (bad) return c.json({ error: `Unknown service "${bad}". Use database or storage.` }, 400);
+
   lock(name);
   let srcDir: string;
   try {
@@ -70,7 +76,7 @@ app.post("/api/deploy/:name", async (c) => {
   c.header("x-app-name", name); // lets the CLI update .deployboat.json after a rename
   return streamText(c, async (out) => {
     try {
-      const url = await deploy(name, srcDir, (line) => out.writeln(line));
+      const url = await deploy(name, srcDir, (line) => out.writeln(line), add as any);
       await out.writeln(`LIVE ${url}`);
     } catch (e) {
       await out.writeln(`FAILED ${(e as Error).message}`);

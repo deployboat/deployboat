@@ -21,6 +21,8 @@ const HELP = `Deploy Boat — publish any project to your own server.
 
   deployboat login <server-url> <token>   connect this computer (once)
   deployboat deploy [folder]              publish a folder (default: this one)
+             [--with database,storage]    …and add a database and/or file storage
+  deployboat add database|storage         add a database or file storage to this app
   deployboat apps                         list your apps
   deployboat status                       this app's status and address
   deployboat logs [--lines 100]           this app's recent output
@@ -50,11 +52,20 @@ try {
 
     case "deploy": {
       if (!json) console.log("→ Uploading…");
-      const r = await deploy({ dir: args[0] ?? ".", name: flag("name"), conn: conn(), onLine: json ? undefined : (l) => console.log(`  ${l}`) });
+      const services = (flag("with") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+      const r = await deploy({ dir: args[0] ?? ".", name: flag("name"), conn: conn(), services, onLine: json ? undefined : (l) => console.log(`  ${l}`) });
       if (json) console.log(JSON.stringify({ ...r, log: r.log.slice(-40) }));
       else if (r.ok) console.log(`\n✓ Live: ${r.url}`);
       else console.error(`\n✗ Deploy failed: ${r.error}`);
       process.exit(r.ok ? 0 : 1);
+    }
+
+    case "add": {
+      const service = args[0];
+      if (!["database", "storage"].includes(service)) fail("Usage: deployboat add database   (or: add storage)");
+      const r = await api(conn(), `/api/apps/${await app()}/services/${service}`, { method: "POST" });
+      out(r, `✓ ${service === "database" ? "Database" : "File storage"} added. The app restarted with the new variables.`);
+      break;
     }
 
     case "apps": {

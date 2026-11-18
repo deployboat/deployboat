@@ -49,8 +49,9 @@ export async function api(conn, path, { method = "GET", body } = {}) {
 export const resolveApp = async (conn, name) => (await api(conn, `/api/resolve/${encodeURIComponent(name)}`)).name;
 
 // Upload a folder and build it. `onLine` gets each build log line.
+// `services` adds a database and/or storage on this deploy, e.g. ["database"].
 // Returns { ok, app, url, error, log } — never throws for build failures.
-export async function deploy({ dir = ".", name, conn, onLine = () => {} }) {
+export async function deploy({ dir = ".", name, conn, services = [], onLine = () => {} }) {
   dir = resolve(dir);
   if (!existsSync(dir)) return { ok: false, error: `Folder not found: ${dir}`, log: [] };
   const app = appNameFor(dir, name);
@@ -59,7 +60,8 @@ export async function deploy({ dir = ".", name, conn, onLine = () => {} }) {
   const tar = spawn("tar", ["-cz", "--exclude=node_modules", "--exclude=.git", "--exclude=.env", "-f", "-", "."], { cwd: dir });
   let res;
   try {
-    res = await fetch(`${conn.server}/api/deploy/${app}`, {
+    const query = services.length ? `?with=${encodeURIComponent(services.join(","))}` : "";
+    res = await fetch(`${conn.server}/api/deploy/${app}${query}`, {
       method: "POST",
       headers: { authorization: `Bearer ${conn.token}`, "content-type": "application/gzip" },
       body: Readable.toWeb(tar.stdout),

@@ -64,6 +64,7 @@ Then, in any project, just say *"publish it"*. Your agent gets these tools:
 | Tool | What the agent can do |
 |---|---|
 | `deploy` | Publish or update the project and get the live URL |
+| `add_service` | Give the app a database or file storage, only if it needs one |
 | `get_logs` | Read the app's output to debug a crash |
 | `set_env` / `unset_env` | Add API keys and settings without putting them in code |
 | `app_status`, `list_apps` | See what's running and where |
@@ -96,7 +97,7 @@ Python, Go, PHP and more. If you already have a Dockerfile, it uses that.
 
 ## Everything your app needs, built in
 
-Every app gets these automatically on its first deploy. Nothing to set up.
+No extra accounts, no extra bills. Add what an app needs with one click, or let your AI agent add it.
 
 - **PostgreSQL database**, ready as `DATABASE_URL`
 - **File storage** (S3-compatible) with public links, for uploads and images
@@ -124,7 +125,7 @@ labelled by which app it belongs to.
 |---|---|---|
 | Cost | One server, unlimited apps | Per app, per seat, per usage |
 | Your data | On your server | On theirs |
-| Database & storage | Included for every app | Extra services, extra bills |
+| Database & storage | Built in, one click per app | Extra services, extra bills |
 | AI agent deploys | Built in (MCP + CLI) | Varies |
 | Setup | One command | Account + config per project |
 

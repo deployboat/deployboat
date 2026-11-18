@@ -76,6 +76,9 @@ async function ensureRunning(log: (l: string) => void) {
   await garage("layout", "apply", "--version", "1");
 }
 
+// Has this app added file storage?
+export const enabled = (app: string) => !!getEnv(app).S3_ACCESS_KEY;
+
 export async function provision(app: string, log: (l: string) => void) {
   await ensureRunning(log);
 

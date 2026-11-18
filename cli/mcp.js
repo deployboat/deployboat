@@ -13,6 +13,15 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {
       path: { type: "string", description: "Absolute path of the project folder. Defaults to the current folder." },
       name: { type: "string", description: "App name (letters, numbers, dashes). Defaults to the name saved in .deployboat.json or the folder name." },
+      services: { type: "array", items: { type: "string", enum: ["database", "storage"] },
+        description: "Add these on this deploy, only if the app needs them: database (PostgreSQL, DATABASE_URL) and/or storage (S3 file storage)." },
+    } },
+  },
+  {
+    name: "add_service",
+    description: "Give an existing app a PostgreSQL database (DATABASE_URL) or S3 file storage (S3_* variables). The app restarts. Only add what the app needs.",
+    inputSchema: { type: "object", required: ["service"], properties: {
+      service: { type: "string", enum: ["database", "storage"] }, name: { type: "string" }, path: { type: "string" },
     } },
   },
   { name: "list_apps", description: "List the apps on the Deploy Boat server with their URLs and status.", inputSchema: { type: "object", properties: {} } },
@@ -50,10 +59,16 @@ async function callTool(name, a = {}) {
   const conn = connection();
   switch (name) {
     case "deploy": {
-      const r = await deploy({ dir: a.path ?? ".", name: a.name, conn });
+      const r = await deploy({ dir: a.path ?? ".", name: a.name, conn, services: Array.isArray(a.services) ? a.services : [] });
       return r.ok
         ? text(`Deployed "${r.app}". Live at ${r.url}\nShow this URL to the user.`)
         : text(`Deploy failed: ${r.error}\n\nLast build log lines:\n${r.log.slice(-40).join("\n")}\n\nFix the problem and deploy again.`, true);
+    }
+    case "add_service": {
+      await api(conn, `/api/apps/${await appOf(conn, a)}/services/${a.service}`, { method: "POST" });
+      return text(a.service === "database"
+        ? "Database added. The app now has DATABASE_URL and has restarted."
+        : "File storage added. The app now has S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION and S3_PUBLIC_URL, and has restarted.");
     }
     case "list_apps": {
       const list = await api(conn, "/api/apps");
@@ -90,7 +105,7 @@ async function handle(msg) {
         protocolVersion: msg.params?.protocolVersion ?? "2025-06-18",
         capabilities: { tools: {} },
         serverInfo: { name: "deployboat", version: VERSION },
-        instructions: "Deploy Boat publishes projects to the user's own server. Call setup_guide before building an app, then deploy. Every app already has a PostgreSQL database and S3 file storage.",
+        instructions: "Deploy Boat publishes projects to the user's own server. Call setup_guide before building an app, then deploy. Apps can add a PostgreSQL database and S3 file storage when they need them.",
       };
     case "ping":
       return {};

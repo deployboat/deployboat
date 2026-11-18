@@ -9,10 +9,13 @@ const RULES = `How apps must be written for Deploy Boat:
 - The app must listen on the port in the PORT environment variable.
 - Don't add a Dockerfile or deploy config. The stack is detected automatically
   (static HTML, Node, Python, Go, PHP, …). A Node app needs a "start" script.
-- A PostgreSQL database is ready. Use the DATABASE_URL environment variable.
-- File storage (S3-compatible) is ready: S3_ENDPOINT, S3_REGION, S3_BUCKET,
-  S3_ACCESS_KEY, S3_SECRET_KEY. Set forcePathStyle: true in the S3 client.
-  Uploaded files are public at S3_PUBLIC_URL + "/" + key.
+- No database or file storage by default. Add them only if the app needs them:
+  - PostgreSQL database: deploy with services ["database"] (MCP deploy tool),
+    or: deployboat deploy --with database   (later: deployboat add database).
+    The app then gets DATABASE_URL.
+  - File storage (S3-compatible): services ["storage"], or --with storage.
+    The app gets S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY.
+    Set forcePathStyle: true in the S3 client. Files are public at S3_PUBLIC_URL + "/" + key.
 - Don't use external database or storage services, and never hard-code secrets.
   If the app needs an API key, ask the user for it and save it as a variable
   (set_env tool, or: deployboat env set KEY=value).
@@ -35,6 +38,7 @@ Other commands (same --server and --token):
   npx deployboat logs              the app's recent output
   npx deployboat env set KEY=value add a secret or setting (restarts the app)
   npx deployboat status            is it running, and where
+  npx deployboat add database      give the app a PostgreSQL database (or: add storage)
 
 ${RULES}
 `);

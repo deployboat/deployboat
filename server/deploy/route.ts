@@ -7,7 +7,7 @@ import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName } from "./run.ts";
-import { filesHost, webUpstream } from "../services/files/index.ts";
+import { filesHost, webUpstream, enabled as hasStorage } from "../services/files/index.ts";
 import { domainsOf } from "../lib/domains.ts";
 import { getShare } from "../lib/share.ts";
 
@@ -63,7 +63,7 @@ export async function syncRoutes() {
     route(config.dashboardHost, `host.docker.internal:${config.port}`),
     // Default address + custom domains, with password protection if it's on.
     ...apps.flatMap((a) => appRoutes(a.name)),
-    ...apps.map((a) => route(filesHost(a.name), webUpstream.dial, webUpstream.host(a.name))),
+    ...apps.filter((a) => hasStorage(a.name)).map((a) => route(filesHost(a.name), webUpstream.dial, webUpstream.host(a.name))),
   ];
 
   const caddyConfig = {
