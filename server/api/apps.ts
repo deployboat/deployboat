@@ -27,6 +27,15 @@ const lastDeploy = (app: string) =>
 
 const exists = (app: string) => !!db.prepare("SELECT 1 FROM apps WHERE name = ?").get(app);
 
+// Custom order on the Apps page: the full list of names, top to bottom.
+apps.put("/order", async (c) => {
+  const { names } = await c.req.json().catch(() => ({}));
+  if (!Array.isArray(names)) return c.json({ error: "Send the app names in order." }, 400);
+  const set = db.prepare("UPDATE apps SET sort_order = ? WHERE name = ?");
+  names.forEach((n: string, i: number) => set.run(i, String(n)));
+  return c.json({ ok: true });
+});
+
 // Stop early with 404 if the app doesn't exist.
 apps.use("/:name/*", async (c, next) => {
   if (!exists(c.req.param("name"))) return c.json({ error: "App not found." }, 404);
@@ -54,12 +63,19 @@ const previewInfo = (name: string) => {
 };
 
 apps.get("/", async (c) => {
-  const rows = db.prepare("SELECT name FROM apps ORDER BY name").all() as { name: string }[];
-  const list = await Promise.all(rows.map(async ({ name }) => ({
+  type Row = { name: string; created_at: string; sort_order: number | null; group_name: string | null; preview_of: string | null };
+  const rows = db.prepare("SELECT name, created_at, sort_order, group_name, preview_of FROM apps ORDER BY created_at DESC").all() as Row[];
+  const previewCount = (n: string) => rows.filter((r) => r.preview_of === n).length;
+  const list = await Promise.all(rows.map(async ({ name, created_at, sort_order, group_name, preview_of }) => ({
     name,
     displayName: displayName(name),
     url: appUrl(name),
-    previewOf: previewInfo(name).previewOf,
+    previewOf: preview_of,
+    previews: previewCount(name),
+    createdAt: created_at,
+    sortOrder: sort_order,
+    group: group_name,
+    services: enabledServices(name),
     state: await containerState(name),
     building: isBusy(name),
     stopped: isStopped(name),
@@ -272,4 +288,12 @@ apps.delete("/:name/services/:service", async (c) => {
   } finally {
     unlock(name);
   }
+});
+
+// Put an app in a group (folder) on the Apps page. Empty = no group.
+apps.put("/:name/group", async (c) => {
+  const { group } = await c.req.json().catch(() => ({}));
+  const value = String(group ?? "").trim().slice(0, 40);
+  db.prepare("UPDATE apps SET group_name = ? WHERE name = ?").run(value || null, c.req.param("name"));
+  return c.json({ ok: true });
 });

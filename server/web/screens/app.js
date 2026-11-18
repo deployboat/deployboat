@@ -2,6 +2,9 @@
 import { api, esc, timeAgo, statusOf, icon, toast, copy } from "../app.js";
 import { share } from "./share.js";
 import { crons } from "./crons.js";
+import { lineChart, uptimeStrip } from "../chart.js";
+import { rangePicker } from "./ranges.js";
+import { bytes } from "../app.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -98,6 +101,9 @@ function overview(box, base, app) {
     ${app.git ? `<div class="row" style="margin-top:14px"><button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button></div>` : ""}
     ${app.git && !app.git.isPreview ? autoDeployCard(app.git) : ""}`;
 
+  const mon = document.createElement("div");
+  box.append(mon);
+  box.stop = monitoring(mon, app);
   wireAutoDeploy(box, base, app);
   box.querySelector("#redeploy")?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;
@@ -107,6 +113,38 @@ function overview(box, base, app) {
       location.hash = `#/apps/${encodeURIComponent(app.name)}/versions`;
     } catch (err) { toast(err.message); }
   });
+}
+
+// Uptime, response time, CPU and memory over time.
+function monitoring(el, app) {
+  let range = "24h", timer, stopped = false;
+  async function draw() {
+    const d = await api(`/api/metrics/apps/${encodeURIComponent(app.name)}?range=${range}`);
+    if (stopped) return;
+    const u = d.uptime;
+    const avgMs = d.ms.length ? Math.round(d.ms.reduce((a, p) => a + p[1], 0) / d.ms.length) : null;
+    el.innerHTML = `
+      <div class="row spread" style="margin:22px 0 10px"><b>Monitoring</b><span id="ranges"></span></div>
+      <div class="card pad" style="margin-bottom:10px">
+        <div class="row spread"><span class="chart-title" style="margin:0">Uptime</span>
+          <span><b>${u.percent === null ? "—" : `${u.percent}%`}</b> <span class="muted">${avgMs !== null ? `· ${avgMs} ms average response` : ""}</span></span></div>
+        <div id="strip" style="margin-top:10px"></div>
+        <p class="note" style="margin-top:6px">Checked every minute. Each block is a slice of the time range; hover for details.</p>
+      </div>
+      <div class="charts">
+        <div class="card pad"><div class="chart-title">Response time</div><div data-c="ms"></div></div>
+        <div class="card pad"><div class="chart-title">CPU</div><div data-c="cpu"></div></div>
+        <div class="card pad"><div class="chart-title">Memory</div><div data-c="mem"></div></div>
+      </div>`;
+    rangePicker(el.querySelector("#ranges"), range, (r) => { range = r; clearTimeout(timer); draw(); });
+    uptimeStrip(el.querySelector("#strip"), u);
+    lineChart(el.querySelector('[data-c="ms"]'), d.ms, { format: (v) => `${Math.round(v)} ms` });
+    lineChart(el.querySelector('[data-c="cpu"]'), d.cpu, { format: (v) => `${Math.round(v)}%` });
+    lineChart(el.querySelector('[data-c="mem"]'), d.mem, { format: (v) => bytes(v) });
+    timer = setTimeout(() => draw().catch(() => {}), 60000);
+  }
+  draw().catch(() => {});
+  return () => { stopped = true; clearTimeout(timer); };
 }
 
 // Auto-deploy on push + pull request previews, with the webhook address to paste into GitHub etc.

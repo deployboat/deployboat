@@ -44,3 +44,7 @@ export const displayName = (app: string) =>
 // Added later: preview apps (one per pull request) point to their main app.
 try { db.exec("ALTER TABLE apps ADD COLUMN preview_of TEXT"); } catch { /* already there */ }
 try { db.exec("ALTER TABLE apps ADD COLUMN pr INTEGER"); } catch { /* already there */ }
+
+// Added later: the user's own order and groups on the Apps page.
+try { db.exec("ALTER TABLE apps ADD COLUMN sort_order INTEGER"); } catch { /* already there */ }
+try { db.exec("ALTER TABLE apps ADD COLUMN group_name TEXT"); } catch { /* already there */ }

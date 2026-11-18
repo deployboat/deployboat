@@ -1,7 +1,14 @@
 // System: machine info, usage meters, and every Docker container.
 import { api, esc, icon, toast, bytes } from "../app.js";
+import { lineChart } from "../chart.js";
+import { rangePicker } from "./ranges.js";
 
-export async function serverScreen(view) {
+export async function serverScreen(page) {
+  // Live numbers redraw every 10s; the history charts only when needed, so hovering isn't interrupted.
+  page.innerHTML = `<div id="live"></div><div id="history"></div>`;
+  const view = page.querySelector("#live");
+  const stopHistory = await history(page.querySelector("#history"));
+
   async function draw() {
     const s = await api("/api/server");
     const mem = s.memory.used / s.memory.total, disk = s.disk.used / (s.disk.total || 1);
@@ -48,7 +55,7 @@ export async function serverScreen(view) {
   }
   await draw();
   const timer = setInterval(() => draw().catch(() => {}), 10000);
-  return () => clearInterval(timer);
+  return () => { clearInterval(timer); stopHistory(); };
 }
 
 // Plain-language name for each container.
@@ -70,4 +77,24 @@ function meter(title, big, small, ratio, href) {
 function uptime(sec) {
   const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600);
   return d ? `${d}d ${h}h` : `${h}h ${Math.floor((sec % 3600) / 60)}m`;
+}
+
+// CPU, memory and disk over time.
+async function history(el) {
+  let range = "24h", timer;
+  async function draw() {
+    const d = await api(`/api/metrics/server?range=${range}`);
+    el.innerHTML = `
+      <div class="row spread" style="margin:26px 0 10px"><b>History</b><span id="ranges"></span></div>
+      <div class="charts">
+        <div class="card pad"><div class="chart-title">CPU</div><div data-c="cpu"></div></div>
+        <div class="card pad"><div class="chart-title">Memory</div><div data-c="mem"></div></div>
+        <div class="card pad"><div class="chart-title">Disk</div><div data-c="disk"></div></div>
+      </div>`;
+    rangePicker(el.querySelector("#ranges"), range, (r) => { range = r; clearTimeout(timer); draw(); });
+    for (const k of ["cpu", "mem", "disk"]) lineChart(el.querySelector(`[data-c="${k}"]`), d[k], { format: (v) => `${Math.round(v)}%`, max: 100 });
+    timer = setTimeout(() => draw().catch(() => {}), 60000);
+  }
+  await draw();
+  return () => clearTimeout(timer);
 }

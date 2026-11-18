@@ -10,6 +10,7 @@ import "../lib/domains.ts"; // and the domains table
 import "../lib/share.ts"; // and the share table
 import { removeCrons } from "../crons/index.ts";
 import "../backups/index.ts"; // makes sure the backups table exists
+import "../monitor/index.ts"; // and the metrics tables
 
 // "running", "exited", "restarting"… or "missing" if there's no container.
 export const containerState = (app: string) =>
@@ -45,6 +46,7 @@ export async function remove(app: string) {
   }
   await run("docker", ["rm", "-f", containerName(app)]).catch(() => {});
   await removeNetwork(app);
+  for (const t of ["metrics", "metrics_hour"]) db.prepare(`DELETE FROM ${t} WHERE key LIKE ?`).run(`app:${app}:%`);
   db.prepare("DELETE FROM apps WHERE name = ?").run(app);
   db.prepare("DELETE FROM deploys WHERE app = ?").run(app);
   db.prepare("DELETE FROM env WHERE app = ?").run(app);
@@ -70,6 +72,8 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("UPDATE crons SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE backups SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE apps SET preview_of = ? WHERE preview_of = ?").run(newName, oldName);
+  // Keep the app's history under its new name.
+  for (const t of ["metrics", "metrics_hour"]) db.prepare(`UPDATE ${t} SET key = 'app:' || ? || substr(key, length('app:' || ?) + 1) WHERE key LIKE ?`).run(newName, oldName, `app:${oldName}:%`);
   db.prepare("UPDATE aliases SET name = ? WHERE name = ?").run(newName, oldName);
   db.prepare("DELETE FROM aliases WHERE old = ?").run(newName);
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);

@@ -223,3 +223,52 @@ details.guide summary { cursor: pointer; }
 
 .events { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px; margin-top: 14px; font-size: 13.5px; }
 .events .check { font-weight: 400; }
+
+/* history charts */
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.charts > .card { position: relative; }
+.chart-title { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
+.chart { display: block; overflow: visible; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { font-size: 10.5px; fill: var(--muted); }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .fill { fill: var(--accent); opacity: .08; }
+.chart .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.chart .hit { cursor: crosshair; }
+.chart-empty { height: 140px; display: grid; place-items: center; color: var(--muted); font-size: 13px; }
+.charts .tip { position: absolute; top: 34px; transform: translateX(-50%); margin-left: 18px; background: var(--ink); color: var(--card); padding: 5px 9px; border-radius: 7px; font-size: 12px; display: grid; pointer-events: none; white-space: nowrap; }
+.charts .tip span { opacity: .7; font-size: 11px; }
+.ranges { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.ranges button { border: 0; background: var(--card); color: var(--muted); padding: 5px 10px; font-size: 12.5px; font-weight: 500; }
+.ranges button.on { background: var(--soft); color: var(--accent); }
+.strip { display: grid; grid-template-columns: repeat(60, 1fr); gap: 2px; height: 26px; }
+.strip i { border-radius: 2px; background: var(--line); }
+.strip i.up { background: var(--ok); } .strip i.part { background: var(--warn); } .strip i.down { background: var(--bad); }
+
+/* apps list */
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.toolbar input { max-width: 260px; }
+.toolbar label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.toolbar select { width: auto; padding: 7px 10px; }
+.group { margin-bottom: 14px; }
+.grouphead { display: flex; align-items: center; gap: 8px; background: none; border: 0; color: var(--ink); padding: 6px 2px; font-size: 14px; }
+.grouphead .chev { display: flex; color: var(--muted); transition: transform .15s; }
+.grouphead .chev.open { transform: rotate(90deg); }
+.applist { overflow: hidden; }
+.approw { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.approw:last-child { border-bottom: 0; }
+.approw:hover { background: var(--bg); }
+.approw .grow { display: grid; min-width: 0; }
+.approw .sub { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.approw .svc { display: flex; gap: 4px; color: var(--muted); }
+.approw .svc svg.i { width: 15px; height: 15px; }
+.approw .status { width: 84px; }
+.approw .when { width: 90px; text-align: right; font-size: 13px; }
+.approw .more { border: 0; padding: 4px 8px; font-size: 16px; line-height: 1; background: none; }
+.approw .handle { cursor: grab; color: var(--muted); letter-spacing: -2px; user-select: none; }
+.approw.dragging { opacity: .5; }
+.menu { display: grid; padding: 6px; margin: 4px 16px 8px auto; width: 220px; position: relative; z-index: 3; box-shadow: 0 8px 24px rgb(0 0 0 / .12); }
+.menu button { text-align: left; background: none; border: 0; padding: 7px 10px; border-radius: 6px; color: var(--ink); display: flex; gap: 6px; align-items: center; font-size: 13.5px; }
+.menu button:hover, .menu button.on { background: var(--soft); }
+@media (max-width: 600px) { .approw .svc, .approw .when { display: none; } .approw .status { width: auto; } }
