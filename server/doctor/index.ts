@@ -29,17 +29,33 @@ import { journal } from "./checks/journal.ts";
 import { oom } from "./checks/oom.ts";
 import { load } from "./checks/load.ts";
 import { failedUnits } from "./checks/failedunits.ts";
+import { logins } from "./checks/logins.ts";
+import { adminUsers } from "./checks/admins.ts";
+import { sshKeys } from "./checks/sshkeys.ts";
+import { extraPorts } from "./checks/extraports.ts";
+import { dockerGroup } from "./checks/dockergroup.ts";
+import { dataPerms } from "./checks/dataperms.ts";
+import { oldTokens } from "./checks/oldtokens.ts";
+import { eol } from "./checks/eol.ts";
+import { internet } from "./checks/internet.ts";
+import { swapUse } from "./checks/swapuse.ts";
+import { database } from "./checks/database.ts";
+import { storage } from "./checks/storage.ts";
+import { domains } from "./checks/domains.ts";
 
 // To add a check: write a file in checks/ and add it here.
 export const CHECKS: Check[] = [
   // health
-  services, apps, disk, inodes, memory, oom, load, dockerSpace, journal, failedUnits, https, backups, time, version,
+  services, apps, database, storage, disk, inodes, memory, swapUse, oom, load, dockerSpace, journal, failedUnits,
+  https, domains, internet, backups, time, version,
   // security
-  firewall, firewallPolicy, exposedPorts, ssh, rootLogin, emptyPasswords, fail2ban, updates, autoUpdates, kernel, reboot,
+  firewall, firewallPolicy, exposedPorts, extraPorts, ssh, rootLogin, sshKeys, adminUsers, emptyPasswords, dockerGroup,
+  dataPerms, oldTokens, logins, fail2ban, updates, autoUpdates, kernel, reboot, eol,
 ];
 
 // Shown as a small label on each check in the dashboard.
-const SECURITY = new Set(["firewall", "firewallpolicy", "exposedports", "ssh", "rootlogin", "emptypasswords", "fail2ban", "updates", "autoupdates", "kernel", "reboot"]);
+const SECURITY = new Set(["firewall", "firewallpolicy", "exposedports", "extraports", "ssh", "rootlogin", "sshkeys", "admins",
+  "emptypasswords", "dockergroup", "dataperms", "oldtokens", "logins", "fail2ban", "updates", "autoupdates", "kernel", "reboot", "eol"]);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS doctor_log (
@@ -63,6 +79,9 @@ const DEFAULT_EVERY: Record<string, Every> = {
   https: "1h", firewall: "1h", firewallpolicy: "1h", exposedports: "1h", ssh: "1h", rootlogin: "1h", fail2ban: "1h",
   backups: "1h", oom: "1h", inodes: "1h", failedunits: "1h", reboot: "1h",
   updates: "1d", autoupdates: "1d", kernel: "1d", emptypasswords: "1d", dockerspace: "1d", journal: "1d", time: "1d", version: "1d",
+  swapuse: "10m",
+  logins: "1h", admins: "1h", sshkeys: "1h", extraports: "1h", internet: "1h", database: "1h", storage: "1h",
+  dockergroup: "1d", dataperms: "1d", oldtokens: "1d", eol: "1d", domains: "1d",
 };
 const everyOf = (id: string): Every => getSetting<Record<string, Every>>("doctor_every", {})[id] ?? DEFAULT_EVERY[id] ?? "1h";
 
