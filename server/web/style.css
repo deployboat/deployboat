@@ -306,9 +306,28 @@ details.guide summary { cursor: pointer; }
 .tick { color: var(--ok); display: flex; } .tick svg.i { width: 16px; height: 16px; }
 .doc-cat { font-size: 11px; font-weight: 500; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 0 7px; margin-left: 4px; vertical-align: 1px; }
 .doc-meta { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); flex-wrap: wrap; margin-top: 4px; }
-.doc-meta select { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; background: transparent; }
+.doc-meta select { width: auto; padding: 2px 6px; font-size: 12px; border-radius: 6px; background: var(--card); color: var(--muted); border: 1px solid var(--line); }
 .doc-meta .slow { color: var(--warn); }
 .linkbtn { background: none; border: 0; color: var(--accent); font-size: 12px; font-weight: 500; padding: 0; }
 .linkbtn:disabled { color: var(--muted); }
 .doc-passed > div .grow { min-width: 160px; }
 .doc-passed > div .doc-meta { margin: 0 0 0 auto; }
+
+/* doctor: "Good to know" rows */
+.doc-info { margin-bottom: 22px; overflow: hidden; }
+.doc-irow { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: start; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.doc-irow:last-child { border-bottom: 0; }
+.doc-idot { color: var(--accent); display: flex; padding-top: 1px; }
+.doc-idot svg.i { width: 18px; height: 18px; }
+.doc-itext { display: grid; gap: 2px; min-width: 0; font-size: 14px; }
+.doc-itext p.muted { font-size: 13px; }
+.doc-itext .doc-meta { margin-top: 6px; }
+.doc-iact { display: flex; gap: 8px; align-items: center; }
+.doc-info > .doc-card { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 600px) {
+  .doc-irow { grid-template-columns: 22px 1fr; }
+  .doc-iact { grid-column: 2; }
+}
+/* problem cards: keep buttons beside the text, or under it on small screens */
+.doc-main { flex-wrap: nowrap; }
+@media (max-width: 600px) { .doc-main { flex-wrap: wrap; } .doc-actions { margin-left: 46px; } }

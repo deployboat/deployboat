@@ -59,7 +59,7 @@ export async function doctorScreen(view) {
 
       ${info.length ? `
         <h3 class="doc-h">Good to know</h3>
-        <div class="doc-list">${info.map(card).join("")}</div>` : ""}
+        <div class="card doc-info">${info.map(infoRow).join("")}</div>` : ""}
 
       ${notYet.length ? `
         <h3 class="doc-h">Not checked yet</h3>
@@ -99,6 +99,25 @@ export async function doctorScreen(view) {
     }));
     view.querySelectorAll("[data-cancel]").forEach((b) => (b.onclick = () => { open.fix = null; draw(); }));
     view.querySelectorAll("[data-run]").forEach((b) => (b.onclick = () => runFix()));
+  }
+
+  // "Good to know": one quiet row per item. If a fix is open, the row gets the full card treatment.
+  function infoRow(i) {
+    if (open.fix?.id === i.id) return card(i);
+    return `
+      <div class="doc-irow">
+        <span class="doc-idot">${icon("info")}</span>
+        <div class="doc-itext">
+          <div><b>${esc(i.title)}</b><span class="doc-cat">${esc(i.category ?? "")}</span></div>
+          <p>${esc(i.message)}</p>
+          ${i.detail ? `<p class="muted">${esc(i.detail)}</p>` : ""}
+          ${meta(i)}
+        </div>
+        ${i.link || i.fix ? `<div class="doc-iact">
+          ${i.link ? `<a class="btn" href="${esc(i.link)}">Open</a>` : ""}
+          ${i.fix ? `<button class="btn" data-fix="${esc(i.id)}" ${data.fixing ? "disabled" : ""}>${esc(i.fix)}</button>` : ""}
+        </div>` : ""}
+      </div>`;
   }
 
   // One check as a card. The open fix (if it's this one) shows inside it.
