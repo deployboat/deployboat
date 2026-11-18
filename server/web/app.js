@@ -4,6 +4,7 @@ import { appsScreen } from "./screens/apps.js";
 import { appScreen, SECTIONS } from "./screens/app.js";
 import { settingsScreen } from "./screens/settings.js";
 import { serverScreen } from "./screens/server.js";
+import { doctorScreen } from "./screens/doctor.js";
 
 const view = document.getElementById("view");
 
@@ -80,6 +81,10 @@ const paths = {
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
   server: "M3 4h18v7H3zM3 13h18v7H3zM7 7.5h.01M7 16.5h.01",
   chevron: "M9 6l6 6-6 6",
+  heart: "M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 000-7.8z",
+  check: "M5 12l5 5 9-10",
+  alert: "M12 3l9.5 17h-19zM12 10v4M12 17h.01",
+  info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v5M12 8h.01",
   sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17v4M17 19h4",
   git: "M6 3.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM6 15.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM18 6.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM6 8.5v7M18 11.5c0 4-6 3-10 5",
   gear: "M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1",
@@ -117,9 +122,15 @@ function drawNav(page, appName, section) {
         : link(`${base}/${id}`, ic, label, id === section)).join("")}`;
   } else {
     nav.innerHTML = `
-      ${link("#/", "box", "Apps", !["settings", "server"].includes(page))}
+      ${link("#/", "box", "Apps", !["settings", "server", "doctor"].includes(page))}
+      ${link("#/doctor", "heart", `Doctor<span class="navbadge" id="docbadge" hidden></span>`, page === "doctor")}
       ${link("#/server", "server", "Server", page === "server")}
       ${link("#/settings", "gear", "Settings", page === "settings")}`;
+    // Number of problems next to "Doctor".
+    api("/api/doctor").then((r) => {
+      const b = document.getElementById("docbadge");
+      if (b && r.issues) { b.textContent = r.issues; b.hidden = false; }
+    }).catch(() => {});
   }
 }
 
@@ -146,6 +157,7 @@ async function render() {
     let stop;
     if (page === "settings") stop = await settingsScreen(box);
     else if (page === "server") stop = await serverScreen(box);
+    else if (page === "doctor") stop = await doctorScreen(box);
     else if (page === "apps" && name) stop = await appScreen(box, decodeURIComponent(name), tab || "overview");
     else stop = await appsScreen(box);
     clearTimeout(spinner);

@@ -174,3 +174,18 @@ ol.steps { display: grid; gap: 14px; padding-left: 20px; }
 label.choice { cursor: pointer; }
 select { font: inherit; width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
 .runs { margin-top: 4px; }
+
+/* doctor */
+.navbadge { margin-left: auto; background: var(--bad); color: #fff; font-size: 11px; font-weight: 600; border-radius: 99px; padding: 0 7px; line-height: 18px; }
+.doc-top { display: flex; align-items: center; gap: 20px; margin-bottom: 14px; }
+.ring { width: 84px; height: 84px; flex-shrink: 0; }
+.ring text { font: 700 24px Inter, sans-serif; fill: var(--ink); }
+.checks { display: grid; gap: 8px; }
+.check { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-left: 3px solid var(--c); flex-wrap: wrap; }
+.check .grow { min-width: 200px; white-space: normal; }
+.check.bad { --c: var(--bad); } .check.warn { --c: var(--warn); } .check.info { --c: var(--accent); } .check.ok { --c: var(--ok); }
+.check .dot { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.check.ok { border-left-color: var(--line); }
+.pill { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.pill.bad { --c: var(--bad); } .pill.warn { --c: var(--warn); } .pill.info { --c: var(--accent); } .pill.ok { --c: var(--ok); }
+ul.will { padding-left: 18px; display: grid; gap: 4px; }
