@@ -6,15 +6,15 @@ import { crons } from "./crons.js";
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
   ["overview", "Overview", "home"],
+  ["domains", "Domains", "globe"],
+  ["storage", "Storage", "folder"],
+  ["database", "Database", "db"],
+  ["share", "Share", "share"],
+  ["crons", "Crons", "clock"],
   ["versions", "Versions", "history"],
   ["logs", "Logs", "term"],
   ["variables", "Variables", "key"],
-  ["database", "Database", "db"],
-  ["storage", "Storage", "folder"],
   ["settings", "Settings", "gear"],
-  ["domains", "Domains", "globe"],
-  ["share", "Share", "share"],
-  ["crons", "Crons", "clock"],
 ];
 
 export async function appScreen(view, name, section) {
