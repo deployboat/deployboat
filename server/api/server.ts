@@ -4,6 +4,7 @@ import os from "node:os";
 import { readFileSync } from "node:fs";
 import { run } from "../lib/shell.ts";
 import { config } from "../lib/config.ts";
+import { sample } from "../lib/procs.ts";
 
 export const server = new Hono();
 
@@ -52,4 +53,11 @@ server.post("/containers/:name/restart", async (c) => {
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name)) return c.json({ error: "Bad name." }, 400);
   try { await run("docker", ["restart", name]); return c.json({ ok: true }); }
   catch { return c.json({ error: `Couldn't restart ${name}.` }, 500); }
+});
+
+// Every process on the server, busiest first. ?sort=cpu or ?sort=memory
+server.get("/processes", async (c) => {
+  const sort = c.req.query("sort") === "memory" ? "memory" : "cpu";
+  try { return c.json(await sample(sort)); }
+  catch { return c.json({ error: "Couldn't read the process list." }, 500); }
 });

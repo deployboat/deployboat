@@ -189,3 +189,16 @@ select { font: inherit; width: 100%; padding: 9px 12px; border: 1px solid var(--
 .pill { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 99px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
 .pill.bad { --c: var(--bad); } .pill.warn { --c: var(--warn); } .pill.info { --c: var(--accent); } .pill.ok { --c: var(--ok); }
 ul.will { padding-left: 18px; display: grid; gap: 4px; }
+
+/* system details */
+a.stat.link { text-decoration: none; transition: border-color .15s; }
+a.stat.link:hover { border-color: var(--accent); }
+.more { display: inline-flex; align-items: center; font-size: 12px; color: var(--accent); }
+.more svg.i { width: 13px; height: 13px; }
+.cores { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px 18px; margin-top: 12px; }
+.cores > div { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.cores .meter { margin: 0; }
+.minibar { display: inline-block; width: 40px; height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; vertical-align: middle; margin-right: 8px; }
+.minibar i { display: block; height: 100%; background: var(--accent); }
+.stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); margin-top: 12px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }

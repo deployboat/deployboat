@@ -5,6 +5,7 @@ import { appScreen, SECTIONS } from "./screens/app.js";
 import { settingsScreen } from "./screens/settings.js";
 import { serverScreen } from "./screens/server.js";
 import { doctorScreen } from "./screens/doctor.js";
+import { processesScreen } from "./screens/processes.js";
 
 const view = document.getElementById("view");
 
@@ -122,9 +123,9 @@ function drawNav(page, appName, section) {
         : link(`${base}/${id}`, ic, label, id === section)).join("")}`;
   } else {
     nav.innerHTML = `
-      ${link("#/", "box", "Apps", !["settings", "server", "doctor"].includes(page))}
+      ${link("#/", "box", "Apps", !["settings", "system", "doctor"].includes(page))}
       ${link("#/doctor", "heart", `Doctor<span class="navbadge" id="docbadge" hidden></span>`, page === "doctor")}
-      ${link("#/server", "server", "Server", page === "server")}
+      ${link("#/system", "server", "System", page === "system")}
       ${link("#/settings", "gear", "Settings", page === "settings")}`;
     // Number of problems next to "Doctor".
     api("/api/doctor").then((r) => {
@@ -156,7 +157,8 @@ async function render() {
   try {
     let stop;
     if (page === "settings") stop = await settingsScreen(box);
-    else if (page === "server") stop = await serverScreen(box);
+    else if (page === "system" && name) stop = await processesScreen(box, name);
+    else if (page === "system") stop = await serverScreen(box);
     else if (page === "doctor") stop = await doctorScreen(box);
     else if (page === "apps" && name) stop = await appScreen(box, decodeURIComponent(name), tab || "overview");
     else stop = await appsScreen(box);

@@ -76,7 +76,7 @@ A clean dashboard for everything you've published:
 
 You shouldn't need to know Linux to run a server safely. The installer sets up
 a firewall, brute-force protection, automatic security updates, swap and log
-limits. The **Server** page shows CPU, memory, disk and every running service
+limits. The **System** page shows CPU, memory, disk and every running service
 in plain words, with a restart button next to each.
 
 ## What's inside

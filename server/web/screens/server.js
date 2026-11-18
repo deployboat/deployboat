@@ -1,4 +1,4 @@
-// Server: machine info, usage meters, and every Docker container.
+// System: machine info, usage meters, and every Docker container.
 import { api, esc, icon, toast, bytes } from "../app.js";
 
 export async function serverScreen(view) {
@@ -7,10 +7,10 @@ export async function serverScreen(view) {
     const mem = s.memory.used / s.memory.total, disk = s.disk.used / (s.disk.total || 1);
     const load = s.load[0] / s.cpus;
     view.innerHTML = `
-      <div class="row spread head"><h1>Server</h1><span class="muted">${esc(s.hostname)} · ${esc(s.ip)}</span></div>
+      <div class="row spread head"><h1>System</h1><span class="muted">${esc(s.hostname)} · ${esc(s.ip)}</span></div>
       <div class="stats">
-        ${meter("CPU load", `${Math.round(load * 100)}%`, `${s.cpus} cores`, load)}
-        ${meter("Memory", bytes(s.memory.used), `of ${bytes(s.memory.total)}`, mem)}
+        ${meter("CPU load", `${Math.round(load * 100)}%`, `${s.cpus} cores`, load, "#/system/cpu")}
+        ${meter("Memory", bytes(s.memory.used), `of ${bytes(s.memory.total)}`, mem, "#/system/memory")}
         ${meter("Disk", bytes(s.disk.used), `of ${bytes(s.disk.total)}`, disk)}
         <div class="card stat"><b>${uptime(s.uptime)}</b><span>uptime</span></div>
       </div>
@@ -57,10 +57,14 @@ function label(name) {
   return { caddy: "Web server & HTTPS", postgres: "Database", garage: "File storage", buildkit: "App builder" }[name] ?? "";
 }
 
-function meter(title, big, small, ratio) {
+// A usage card. With `href`, it links to a detail page.
+function meter(title, big, small, ratio, href) {
   const c = ratio > 0.9 ? "var(--bad)" : ratio > 0.75 ? "var(--warn)" : "var(--accent)";
-  return `<div class="card stat"><span>${title}</span><b>${big}</b><span>${small}</span>
-    <div class="meter" style="--c:${c}"><i style="width:${Math.min(100, Math.round(ratio * 100))}%"></i></div></div>`;
+  const tag = href ? "a" : "div";
+  return `<${tag} class="card stat ${href ? "link" : ""}" ${href ? `href="${href}"` : ""}>
+    <span class="row spread">${title}${href ? `<span class="more">Details ${icon("chevron")}</span>` : ""}</span>
+    <b>${big}</b><span>${small}</span>
+    <div class="meter" style="--c:${c}"><i style="width:${Math.min(100, Math.round(ratio * 100))}%"></i></div></${tag}>`;
 }
 
 function uptime(sec) {
