@@ -9,7 +9,7 @@
   <a href="#install">Install</a> ·
   <a href="#publish-an-app">Publish</a> ·
   <a href="#whats-inside">What's inside</a> ·
-  <a href="#contributing">Contributing</a>
+  <a href="#feedback">Feedback</a>
 </p>
 
 ---
@@ -118,17 +118,18 @@ install.sh    the installer
 If you can read a bit of JavaScript, you can follow a deploy from start to finish
 in about ten minutes. Start at `server/deploy/index.ts`.
 
-## Contributing
+## Feedback
 
-Issues and pull requests are very welcome, especially from people who are new
-to this kind of project. Good first things:
+I'm not taking pull requests, but feedback helps a lot. If something broke,
+confused you, or felt harder than it should, please
+[open an issue](https://github.com/osbulbul/deploy-boat/issues). Things I'd love to hear:
 
-- try it on your own server and tell me what confused you
-- make an error message friendlier
-- improve a dashboard screen
-- add a built-in service (copy `server/services/postgres/` and go)
+- what happened when you tried it on your own server
+- an error message that didn't make sense
+- a dashboard screen that felt confusing
+- a built-in service you wish every app had
 
-Keep it simple. If a change needs a long explanation, it's probably too clever.
+You're welcome to fork it and make it your own.
 
 ## License
 
