@@ -6,6 +6,7 @@ import { syncRoutes } from "./deploy/route.ts";
 import { startScheduler } from "./crons/index.ts";
 import { startDoctor } from "./doctor/index.ts";
 import { startBackups } from "./backups/index.ts";
+import { isolateExistingApps } from "./deploy/network.ts";
 
 serve({ fetch: app.fetch, port: config.port, hostname: "0.0.0.0" });
 console.log(`Deploy Boat running on :${config.port}`);
@@ -15,6 +16,9 @@ console.log("Token:     sudo cat /var/lib/deployboat/token");
 startScheduler();
 startDoctor();
 startBackups();
+
+// Older servers: give every app its own network (once; quick if already done).
+await isolateExistingApps().catch((e) => console.error("Network isolation:", e.message));
 
 // Caddy may still be starting, so keep trying for a minute.
 for (let i = 1; i <= 30; i++) {

@@ -7,6 +7,7 @@ import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName } from "./run.ts";
+import { serviceGateway } from "./network.ts";
 import { filesHost, webUpstream, enabled as hasStorage } from "../services/files/index.ts";
 import { domainsOf } from "../lib/domains.ts";
 import { getShare } from "../lib/share.ts";
@@ -60,7 +61,7 @@ function appRoutes(app: string) {
 export async function syncRoutes() {
   const apps = db.prepare("SELECT name FROM apps").all() as { name: string }[];
   const routes = [
-    route(config.dashboardHost, `host.docker.internal:${config.port}`),
+    route(config.dashboardHost, `${await serviceGateway().catch(() => "host.docker.internal")}:${config.port}`),
     // Default address + custom domains, with password protection if it's on.
     ...apps.flatMap((a) => appRoutes(a.name)),
     ...apps.filter((a) => hasStorage(a.name)).map((a) => route(filesHost(a.name), webUpstream.dial, webUpstream.host(a.name))),

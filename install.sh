@@ -45,8 +45,10 @@ command -v railpack >/dev/null || curl -fsSL https://railpack.com/install.sh | b
 
 say "Starting BuildKit and Caddy"
 docker network inspect deployboat >/dev/null 2>&1 || docker network create deployboat >/dev/null
-# Let Caddy (inside Docker) reach Deploy Boat on the host. Not open to the internet.
-ufw allow from 172.16.0.0/12 to any port 3000 proto tcp >/dev/null
+# Let Caddy (on the deployboat network) reach Deploy Boat on the host. Not apps, not the internet.
+SUBNET="$(docker network inspect -f '{{(index .IPAM.Config 0).Subnet}}' deployboat)"
+ufw allow from "$SUBNET" to any port 3000 proto tcp >/dev/null
+ufw delete allow from 172.16.0.0/12 to any port 3000 proto tcp >/dev/null 2>&1 || true  # older, wider rule
 docker inspect buildkit >/dev/null 2>&1 || docker run -d --name buildkit --privileged --restart unless-stopped moby/buildkit >/dev/null 2>&1
 mkdir -p /var/lib/deployboat/caddy
 chmod 700 /var/lib/deployboat  # app secrets live here: root only

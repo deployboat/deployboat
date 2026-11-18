@@ -2,6 +2,7 @@
 import { db, setStopped } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName, start } from "./run.ts";
+import { removeNetwork } from "./network.ts";
 import { syncRoutes } from "./route.ts";
 import { renameServices, removeAllServices } from "../services/index.ts";
 import "./git.ts"; // makes sure the git table exists
@@ -43,6 +44,7 @@ export async function remove(app: string) {
     await remove(name);
   }
   await run("docker", ["rm", "-f", containerName(app)]).catch(() => {});
+  await removeNetwork(app);
   db.prepare("DELETE FROM apps WHERE name = ?").run(app);
   db.prepare("DELETE FROM deploys WHERE app = ?").run(app);
   db.prepare("DELETE FROM env WHERE app = ?").run(app);
@@ -73,6 +75,7 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);
 
   await renameServices(oldName, newName);
+  await removeNetwork(oldName);
   if (image) await start(newName, image, () => {});
   await syncRoutes();
 }

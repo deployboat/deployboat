@@ -10,6 +10,7 @@ import { Cron } from "croner";
 import { spawn } from "node:child_process";
 import { db, isStopped } from "../lib/db.ts";
 import { containerName } from "../deploy/run.ts";
+import { containerIp } from "../deploy/network.ts";
 import { notify } from "../alerts/index.ts";
 
 db.exec(`
@@ -65,8 +66,10 @@ export const isRunning = (id: number) => running.has(id);
 const clip = (s: string) => (s.length > MAX_OUTPUT ? "…" + s.slice(-MAX_OUTPUT) : s);
 
 async function callUrl(job: Job): Promise<string> {
-  // Called inside the server network, so it works even when the site has a password.
-  const url = `http://${containerName(job.app)}:3000${job.target.startsWith("/") ? "" : "/"}${job.target}`;
+  // Straight to the app's container (not through Caddy), so it works even when the site has a password.
+  const ip = await containerIp(job.app).catch(() => "");
+  if (!ip) throw new Error("The app isn't running.");
+  const url = `http://${ip}:3000${job.target.startsWith("/") ? "" : "/"}${job.target}`;
   const res = await fetch(url, {
     headers: { "user-agent": "DeployBoat-Cron", "x-deployboat-cron": job.name },
     signal: AbortSignal.timeout(job.timeout * 1000),

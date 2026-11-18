@@ -1,10 +1,10 @@
 // Step 2: replace the old container with a new one, with the app's env vars.
 import { run } from "../lib/shell.ts";
-import { config } from "../lib/config.ts";
 import { getEnv } from "../lib/env.ts";
 import { setStopped } from "../lib/db.ts";
 
-export const containerName = (name: string) => `app-${name}`;
+import { containerName, prepareNetwork } from "./network.ts";
+export { containerName };
 
 export async function start(name: string, image: string, log: (l: string) => void) {
   log("→ Starting…");
@@ -12,11 +12,12 @@ export async function start(name: string, image: string, log: (l: string) => voi
   const envArgs = Object.entries(env).flatMap(([k, v]) => ["-e", `${k}=${v}`]);
 
   await run("docker", ["rm", "-f", containerName(name)]).catch(() => {});
+  const network = await prepareNetwork(name); // its own network: can't see other apps
   try {
     await run("docker", [
       "run", "-d",
       "--name", containerName(name),
-      "--network", config.dockerNetwork,
+      "--network", network,
       "--restart", "unless-stopped",
       ...envArgs,
       image,
