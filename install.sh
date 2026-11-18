@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Deploy Boat installer. Ubuntu 22.04/24.04 or Debian 12. Run as root:
-#   curl -fsSL <url>/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/osbulbul/deploy-boat/main/install.sh | sudo bash
 set -euo pipefail
 
-REPO="${DEPLOYBOAT_REPO:-https://github.com/CHANGE-ME/deploy-boat.git}"
+REPO="${DEPLOYBOAT_REPO:-https://github.com/osbulbul/deploy-boat.git}"
 DIR=/opt/deployboat
 say() { printf '\n\033[1;34m→ %s\033[0m\n' "$1"; }
 
