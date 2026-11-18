@@ -11,7 +11,8 @@ import { previewsOf } from "../deploy/previews.ts";
 import { backupNow } from "../backups/index.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
 import { resolveName, isStopped, displayName } from "../lib/db.ts";
-import { domainsOf, domainOwner, addDomain, removeDomain, validHost, dnsReady } from "../lib/domains.ts";
+import { domainsOf, domainOwner, addDomain, removeDomain, hostTaken } from "../lib/domains.ts";
+import { checkDns, cleanHost, looksLikeHost } from "../lib/dns.ts";
 import { syncRoutes } from "../deploy/route.ts";
 import { config } from "../lib/config.ts";
 import { share } from "./share.ts";
@@ -215,20 +216,27 @@ apps.put("/:name/display-name", async (c) => {
 
 apps.get("/:name/domains", async (c) => {
   const name = c.req.param("name");
-  const custom = await Promise.all(domainsOf(name).map(async (host) => ({ host, ready: await dnsReady(host) })));
-  return c.json({ address: appUrl(name), baseDomain: config.baseDomain, ip: config.publicIp, custom });
+  // Each domain with its DNS check: what's wrong and how to fix it.
+  const custom = await Promise.all(domainsOf(name).map(async (host) => {
+    const dns = await checkDns(host);
+    return { host, ready: dns.ok, dns };
+  }));
+  return c.json({ address: appUrl(name), baseDomain: config.baseDomain, nipDomain: config.nipDomain, ip: config.publicIp, custom });
 });
 
 apps.post("/:name/domains", async (c) => {
   const name = c.req.param("name");
   const { host: raw } = await c.req.json().catch(() => ({}));
-  const host = String(raw ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!validHost(host)) return c.json({ error: "That doesn't look like a domain. Example: myshop.com or www.myshop.com" }, 400);
+  const host = cleanHost(raw);
+  if (!looksLikeHost(host)) return c.json({ error: "That doesn't look like a domain. Example: myshop.com or www.myshop.com" }, 400);
+  const taken = hostTaken(host);
+  if (taken) return c.json({ error: taken }, 400);
   const owner = domainOwner(host);
   if (owner) return c.json({ error: owner === name ? "Already added." : `This domain is used by ${displayName(owner)}.` }, 409);
   addDomain(name, host);
   await syncRoutes();
-  return c.json({ ok: true, ready: await dnsReady(host) });
+  const dns = await checkDns(host);
+  return c.json({ ok: true, ready: dns.ok, dns });
 });
 
 apps.delete("/:name/domains/:host", async (c) => {

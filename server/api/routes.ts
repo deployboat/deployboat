@@ -21,6 +21,9 @@ import { resolveName, db } from "../lib/db.ts";
 import { isService } from "../services/index.ts";
 import { getMail, saveMail } from "../services/email/index.ts";
 import { sendEmail } from "../alerts/channels/email.ts";
+import { serverDomain, saveServerDomain, domainOwner } from "../lib/domains.ts";
+import { checkDns, cleanHost, looksLikeHost } from "../lib/dns.ts";
+import { syncRoutes } from "../deploy/route.ts";
 
 export const app = new Hono();
 
@@ -50,7 +53,7 @@ app.get("/api/resolve/:name", (c) => {
 });
 
 app.get("/api/settings", (c) =>
-  c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain }),
+  c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain, nipDomain: config.nipDomain }),
 );
 
 // Email for apps: the one SMTP provider apps send through. Password never goes back to the browser.
@@ -73,6 +76,42 @@ app.put("/api/settings/mail", async (c) => {
 });
 
 app.delete("/api/settings/mail", (c) => { saveMail(null); return c.json({ ok: true }); });
+
+// Your own domain for the server (*.example.com) and, optionally, the dashboard.
+const domainView = async () => {
+  const d = serverDomain();
+  const [base, dashboard] = await Promise.all([
+    d.base ? checkDns(d.base, { wildcard: true }) : null,
+    d.dashboard ? checkDns(d.dashboard) : null,
+  ]);
+  return { base: d.base, dashboard: d.dashboard, ip: config.publicIp, nipDomain: config.nipDomain,
+    nipDashboard: config.nipDashboard, dashboardHost: config.dashboardHost, checks: { base, dashboard } };
+};
+
+app.get("/api/settings/domain", async (c) => c.json(await domainView()));
+
+// Check (and save, if DNS is right or `force` is set). Empty base = back to the free nip.io addresses.
+app.put("/api/settings/domain", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const base = cleanHost(b.base).replace(/^\*\./, "");
+  const dashboard = cleanHost(b.dashboard);
+  for (const h of [base, dashboard].filter(Boolean)) {
+    if (!looksLikeHost(h)) return c.json({ error: `"${h}" doesn't look like a domain. Example: example.com` }, 400);
+    if (h.endsWith(".nip.io")) return c.json({ error: "Use a domain you own. The nip.io addresses are already free." }, 400);
+  }
+  if (dashboard && domainOwner(dashboard)) return c.json({ error: `${dashboard} is already used by an app.` }, 409);
+
+  const checks = {
+    base: base ? await checkDns(base, { wildcard: true }) : null,
+    dashboard: dashboard ? await checkDns(dashboard) : null,
+  };
+  const ok = !Object.values(checks).some((x) => x && !x.ok);
+  if (!ok && !b.force) return c.json({ saved: false, checks });
+
+  saveServerDomain({ base, dashboard });
+  await syncRoutes();
+  return c.json({ saved: true, ...(await domainView()) });
+});
 
 // New main token. Other browsers and anything using the old token are logged out.
 // Agent tokens keep working. (Agent tokens can't call this: see api/auth.ts.)

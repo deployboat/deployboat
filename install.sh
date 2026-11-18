@@ -2,6 +2,10 @@
 # Deploy Boat installer (and updater). Ubuntu 22.04 / 24.04 or Debian 12. Run as root:
 #   curl -fsSL deployboat.github.io/install.sh | sudo bash
 #
+# With your own domain (apps at <name>.example.com, dashboard at deployboat.example.com):
+#   curl -fsSL deployboat.github.io/install.sh | sudo bash -s -- --domain example.com
+# You can also add or change the domain later, in the dashboard under Settings.
+#
 # Safe to run again: it skips what's already there and updates the rest.
 # Everything the commands print goes to the log file; the screen shows one line per step.
 set -euo pipefail
@@ -10,6 +14,22 @@ REPO="${DEPLOYBOAT_REPO:-https://github.com/deployboat/deployboat.git}"
 DIR=/opt/deployboat
 DATA=/var/lib/deployboat
 LOG=/var/log/deployboat-install.log
+UNIT_FILE=/etc/systemd/system/deployboat.service
+
+# --domain example.com (or DOMAIN=example.com). Optional.
+DOMAIN="${DOMAIN:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --domain) DOMAIN="${2:-}"; shift 2 || shift ;;
+    --domain=*) DOMAIN="${1#*=}"; shift ;;
+    *) shift ;;
+  esac
+done
+DOMAIN="$(printf '%s' "$DOMAIN" | tr 'A-Z' 'a-z' | sed -e 's#^https\?://##' -e 's#^\*\.##' -e 's#[/:].*$##' -e 's#\.$##')"
+# Updating without --domain keeps the domain from the last install.
+if [ -z "$DOMAIN" ] && [ -f "$UNIT_FILE" ]; then
+  DOMAIN="$(sed -n 's/^Environment=BASE_DOMAIN=//p' "$UNIT_FILE")"
+fi
 export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a NEEDRESTART_SUSPEND=1
 
 # --- looks -------------------------------------------------------------------------
@@ -144,7 +164,7 @@ get_code() {
 }
 
 start_deployboat() {
-  cat > /etc/systemd/system/deployboat.service <<UNIT
+  cat > "$UNIT_FILE" <<UNIT
 [Unit]
 Description=Deploy Boat
 After=docker.service
@@ -154,6 +174,7 @@ Requires=docker.service
 WorkingDirectory=$DIR/server
 ExecStart=$(command -v node) index.ts
 Environment=PUBLIC_IP=$IP
+Environment=BASE_DOMAIN=$DOMAIN
 Environment=BUILDKIT_HOST=docker-container://buildkit
 Restart=always
 
@@ -171,6 +192,32 @@ UNIT
   systemctl status deployboat --no-pager || true
   journalctl -u deployboat -n 30 --no-pager || true
   return 1
+}
+
+# Does *.DOMAIN point here? Ask public DNS (1.1.1.1) with a random name, the way a new app's address would.
+# Not a hard stop: the free nip.io addresses work meanwhile, and the dashboard re-checks.
+DOMAIN_OK=true
+check_domain() {
+  local probe="check-$RANDOM$RANDOM.$DOMAIN" got=""
+  if command -v dig >/dev/null; then
+    got="$(dig +short +time=4 +tries=2 A "$probe" @1.1.1.1 2>/dev/null | grep -E '^[0-9.]+$' | sort -u | tr '\n' ' ' || true)"
+  else
+    got="$(getent ahostsv4 "$probe" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ' || true)"
+  fi
+  got="${got% }"
+  [ "$got" = "$IP" ] && { line "  Domain      ${B}*.${DOMAIN}${X} ${G}points here ✓${X}"; return; }
+  DOMAIN_OK=false
+  line ""
+  if [ -z "$got" ]; then warn "${B}*.${DOMAIN}${X} doesn't point anywhere yet."
+  else warn "${B}*.${DOMAIN}${X} points to ${got}, not to this server (${IP})."
+  fi
+  line "    Where you bought the domain, open its DNS settings and add:"
+  line ""
+  line "      Type ${B}A${X}    Name ${B}*${X}    Value ${B}${IP}${X}"
+  line ""
+  line "    ${DIM}If ${DOMAIN} is a subdomain (like apps.example.com), the name is *.apps instead.${X}"
+  line "    ${DIM}On Cloudflare, set it to \"DNS only\" (grey cloud). Remove any AAAA (IPv6) record for it.${X}"
+  line "    ${DIM}Installing anyway. Until DNS is right, use the free address below.${X}"
 }
 
 # --- before we start -----------------------------------------------------------------
@@ -210,8 +257,15 @@ fi
 IP="$(curl -fsS --max-time 10 https://api.ipify.org || true)"
 [ -n "$IP" ] || fail "Couldn't find this server's public IP address."
 
+if [ -n "$DOMAIN" ]; then
+  echo "$DOMAIN" | grep -Eq '^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z][a-z0-9-]+$' \
+    || fail "\"$DOMAIN\" doesn't look like a domain. Example: --domain example.com"
+  case "$DOMAIN" in *.nip.io) fail "Use a domain you own. Without --domain you get free nip.io addresses anyway." ;; esac
+fi
+
 line "  ${PRETTY_NAME} · $(uname -m) · ${MEM_MB} MB memory · ${DISK_GB} GB free · ${IP}"
 if $UPDATING; then line "  ${BL}Updating your existing install.${X} Apps and data are not touched."; fi
+[ -z "$DOMAIN" ] || check_domain
 [ "$MEM_MB" -ge 900 ] || warn "Less than 1 GB of memory. It works, but builds can be slow."
 line ""
 
@@ -229,7 +283,9 @@ STEP=$((STEP + 1)); printf '  %s✓%s %s[%d/%d]%s Done\n' "$G" "$X" "$DIM" "$STE
 
 # --- what now ------------------------------------------------------------------------
 
-URL="https://deployboat.$IP.nip.io"
+NIP_URL="https://deployboat.$IP.nip.io"
+URL="$NIP_URL"
+if [ -n "$DOMAIN" ] && $DOMAIN_OK; then URL="https://deployboat.$DOMAIN"; fi
 TOKEN="$(cat "$DATA/token")"
 VERSION="$(git -C "$DIR" log -1 --format='%h' 2>/dev/null || echo '?')"
 
@@ -238,6 +294,7 @@ if $UPDATING; then
   line "  ${G}${B}✓ Deploy Boat is updated${X} ${DIM}(version ${VERSION})${X}"
   line ""
   line "  Dashboard   ${B}${URL}${X}"
+  [ "$URL" = "$NIP_URL" ] || line "  ${DIM}Backup      ${NIP_URL}${X}"
   line ""
   exit 0
 fi
@@ -247,6 +304,9 @@ line ""
 line "  ${B}1. Open your dashboard${X}"
 line "     ${URL}"
 line "     ${DIM}The first visit can take a few seconds while HTTPS is set up.${X}"
+if [ "$URL" != "$NIP_URL" ]; then line "     ${DIM}Backup address, always works: ${NIP_URL}${X}"
+elif [ -n "$DOMAIN" ]; then line "     ${DIM}Once DNS is right: https://deployboat.${DOMAIN} (Server Doctor tells you).${X}"
+fi
 line ""
 line "  ${B}2. Log in with this token${X}"
 line "     ${TOKEN}"

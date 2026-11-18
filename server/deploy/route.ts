@@ -9,7 +9,7 @@ import { run } from "../lib/shell.ts";
 import { containerName } from "./run.ts";
 import { serviceGateway } from "./network.ts";
 import { filesHost, webUpstream, enabled as hasStorage } from "../services/files/index.ts";
-import { domainsOf } from "../lib/domains.ts";
+import { domainsOf, appHosts, dashboardHosts } from "../lib/domains.ts";
 import { getShare } from "../lib/share.ts";
 
 // Send requests for `hosts` to `dial`. Optionally rewrite the Host header.
@@ -27,7 +27,7 @@ const route = (hosts: string | string[], dial: string, hostHeader?: string) => (
 //   2. has that cookie → straight to the app
 //   3. everyone else   → username/password prompt, then the app
 function appRoutes(app: string) {
-  const hosts = [`${app}.${config.baseDomain}`, ...domainsOf(app)];
+  const hosts = [...appHosts(app), ...domainsOf(app)];
   const proxy = { handler: "reverse_proxy", upstreams: [{ dial: `${containerName(app)}:3000` }] };
   const s = getShare(app);
   if (s.mode !== "password" || !s.password_hash || !s.token) return [{ match: [{ host: hosts }], handle: [proxy], terminal: true }];
@@ -61,10 +61,10 @@ function appRoutes(app: string) {
 export async function syncRoutes() {
   const apps = db.prepare("SELECT name FROM apps").all() as { name: string }[];
   const routes = [
-    route(config.dashboardHost, `${await serviceGateway().catch(() => "host.docker.internal")}:${config.port}`),
-    // Default address + custom domains, with password protection if it's on.
+    route(dashboardHosts(), `${await serviceGateway().catch(() => "host.docker.internal")}:${config.port}`),
+    // Free addresses + custom domains, with password protection if it's on.
     ...apps.flatMap((a) => appRoutes(a.name)),
-    ...apps.filter((a) => hasStorage(a.name)).map((a) => route(filesHost(a.name), webUpstream.dial, webUpstream.host(a.name))),
+    ...apps.filter((a) => hasStorage(a.name)).map((a) => route([filesHost(a.name), `files.${a.name}.${config.nipDomain}`], webUpstream.dial, webUpstream.host(a.name))),
   ];
 
   const caddyConfig = {

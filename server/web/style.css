@@ -331,3 +331,25 @@ details.guide summary { cursor: pointer; }
 /* problem cards: keep buttons beside the text, or under it on small screens */
 .doc-main { flex-wrap: nowrap; }
 @media (max-width: 600px) { .doc-main { flex-wrap: wrap; } .doc-actions { margin-left: 46px; } }
+
+/* DNS help (app Domains, Settings → Your domain) */
+.btn.ghost { border-color: transparent; background: none; padding: 4px; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); }
+.dnsrec { display: grid; grid-template-columns: auto 1fr 1.6fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--card); }
+.dnsrec > div { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-right: 1px solid var(--line); min-width: 0; }
+.dnsrec > div:last-child { border-right: 0; }
+.dnsrec span { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+.dnsrec code { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.dnsrec .btn { margin-left: auto; }
+.dnsprob { border-left: 3px solid var(--warn); padding: 4px 0 4px 12px; margin-bottom: 10px; }
+.dnsprob p { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+.dnsok { display: flex; align-items: center; gap: 6px; color: var(--ok); font-size: 13.5px; }
+.dnsok b { color: var(--ink); }
+.domrow { display: block !important; }
+.domrow > .row { flex-wrap: nowrap; }
+.domrow .dnshelp { margin-top: 12px; }
+@media (max-width: 640px) {
+  .dnsrec { grid-template-columns: 1fr; }
+  .dnsrec > div { border-right: 0; border-bottom: 1px solid var(--line); }
+  .dnsrec > div:last-child { border-bottom: 0; }
+}

@@ -5,6 +5,7 @@ import { crons } from "./crons.js";
 import { lineChart, uptimeStrip } from "../chart.js";
 import { rangePicker } from "./ranges.js";
 import { bytes } from "../app.js";
+import { dnsHelp, wireCopy } from "./dns.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -228,7 +229,8 @@ async function domains(box, base, app) {
   box.innerHTML = `
     <form class="card pad" id="address">
       <b>Free address</b>
-      <p class="muted" style="font-size:13px;margin:2px 0 10px">Always works, HTTPS included. Changing it keeps your database, files and project folder working.</p>
+      <p class="muted" style="font-size:13px;margin:2px 0 10px">Always works, HTTPS included. Changing it keeps your database, files and project folder working.
+        ${d.baseDomain !== d.nipDomain ? `<br><code>${esc(app.name)}.${esc(d.nipDomain)}</code> works too, as a backup.` : ""}</p>
       <div class="row" style="flex-wrap:nowrap">
         <input name="name" value="${esc(app.name)}" pattern="[a-z0-9][a-z0-9\-]*" required style="flex:1;min-width:100px">
         <span class="muted" style="white-space:nowrap">.${esc(d.baseDomain)}</span>
@@ -246,24 +248,28 @@ async function domains(box, base, app) {
         </form>
       </div>
       <div class="list" style="border-top:1px solid var(--line)">${d.custom.map((x) => `
-        <div>
-          <span class="status ${x.ready ? "live" : "building"}">${x.ready ? "Connected" : "Waiting for DNS"}</span>
-          <a class="grow" href="https://${esc(x.host)}" target="_blank" style="text-decoration:none">${esc(x.host)}</a>
-          <button class="btn danger" data-del="${esc(x.host)}">${icon("trash")}</button>
+        <div class="domrow">
+          <div class="row">
+            <span class="status ${x.ready ? "live" : "building"}">${x.ready ? "Connected" : "Needs a DNS change"}</span>
+            <a class="grow" href="https://${esc(x.host)}" target="_blank" style="text-decoration:none">${esc(x.host)}</a>
+            <button class="btn danger" data-del="${esc(x.host)}">${icon("trash")}</button>
+          </div>
+          ${x.ready ? "" : dnsHelp(x.dns)}
         </div>`).join("") || `<div class="muted">No domains yet.</div>`}
       </div>
     </div>
 
-    ${d.custom.some((x) => !x.ready) || !d.custom.length ? `
+    ${!d.custom.length ? `
     <div class="card pad" style="margin-top:14px">
       <b>How to connect a domain</b>
       <ol class="steps" style="margin-top:10px">
-        <li>Open the DNS settings where you bought the domain (Namecheap, GoDaddy, Cloudflare…).</li>
-        <li>Add an <b>A record</b>: name <code>@</code> (or <code>www</code>), value <code>${esc(d.ip)}</code>.</li>
-        <li>Wait a few minutes. The status here turns to <b>Connected</b> by itself.</li>
+        <li>Add it above.</li>
+        <li>Open the DNS settings where you bought it (Namecheap, GoDaddy, Cloudflare…) and add the record this page shows you.
+          Usually an <b>A record</b> with value <code>${esc(d.ip)}</code>.</li>
+        <li>Wait a few minutes. Deploy Boat checks the DNS, tells you if something's off, and sets up HTTPS once it's right.</li>
       </ol>
-      <p class="note" style="margin-top:10px">Using Cloudflare? Set the record to "DNS only" (grey cloud) so HTTPS can be set up.</p>
     </div>` : ""}`;
+  wireCopy(box);
 
   box.querySelector("#address").onsubmit = async (e) => {
     e.preventDefault();
@@ -280,7 +286,7 @@ async function domains(box, base, app) {
     e.preventDefault();
     try {
       const r = await api(`${base}/domains`, { method: "POST", body: { host: e.target.host.value } });
-      toast(r.ready ? "Domain connected" : "Added. Now point its DNS to your server.");
+      toast(r.ready ? "Domain connected" : "Added. Now add the DNS record shown below.");
       domains(box, base, app);
     } catch (err) { toast(err.message); }
   };

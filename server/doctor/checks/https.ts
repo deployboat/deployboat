@@ -25,7 +25,10 @@ async function hosts() {
   const apps = (db.prepare("SELECT name FROM apps").all() as { name: string }[]).map((a) => a.name);
   const custom = apps.flatMap(domainsOf);
   const connected = (await Promise.all(custom.map(async (h) => ((await dnsReady(h)) ? h : null)))).filter(Boolean) as string[];
-  return [config.dashboardHost, ...apps.map((a) => `${a}.${config.baseDomain}`), ...connected];
+  // Your own server domain counts once its DNS is right (until then the free nip.io ones are used).
+  const own = config.baseDomain !== config.nipDomain && (await dnsReady(config.dashboardHost));
+  const base = own ? config.baseDomain : config.nipDomain;
+  return [...new Set([config.nipDashboard, ...(own ? [config.dashboardHost] : []), ...apps.map((a) => `${a}.${base}`), ...connected])];
 }
 
 export const https: Check = {

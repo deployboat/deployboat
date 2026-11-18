@@ -137,7 +137,11 @@ dashboard, an AI-first workflow, and a server doctor that fixes things for you.
 
 **Do I need to know Docker?** No. Deploy Boat uses it under the hood so you don't have to.
 
-**Do I need a domain?** No. Every app gets a free HTTPS address. Add your own domain anytime.
+**Do I need a domain?** No. Every app gets a free HTTPS address. Add your own domain anytime:
+for one app (`myshop.com`), or for the whole server so every app gets `<name>.example.com`.
+Deploy Boat checks your DNS and tells you exactly which record to add or fix.
+To set it up during install:
+`curl -fsSL deployboat.github.io/install.sh | sudo bash -s -- --domain example.com`
 
 **What server do I need?** Ubuntu 22.04 / 24.04 or Debian 12. 1–2 GB of memory is enough to start.
 

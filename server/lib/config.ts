@@ -21,8 +21,13 @@ export const config = {
   dataDir,
   token: readFileSync(tokenFile, "utf8").trim(),
   publicIp,
-  baseDomain: process.env.BASE_DOMAIN ?? `${publicIp}.nip.io`,
-  dashboardHost: `deployboat.${process.env.BASE_DOMAIN ?? `${publicIp}.nip.io`}`,
+  // The free addresses: always work, even without a domain of your own.
+  nipDomain: `${publicIp}.nip.io`,
+  nipDashboard: `deployboat.${publicIp}.nip.io`,
+  // Where apps and the dashboard live. Your own domain if you set one (installer or Settings),
+  // otherwise the free nip.io ones. lib/domains.ts loads the saved choice at startup.
+  baseDomain: process.env.BASE_DOMAIN || `${publicIp}.nip.io`,
+  dashboardHost: `deployboat.${process.env.BASE_DOMAIN || `${publicIp}.nip.io`}`,
   dockerNetwork: "deployboat",
 };
 
