@@ -4,11 +4,18 @@ import { api, esc, icon, bytes } from "../app.js";
 export async function processesScreen(view, kind) {
   const isCpu = kind !== "memory";
   let timer, filter = "";
+  // Click a column title to sort by it; click again to flip the order.
+  let sort = { key: isCpu ? "cpu" : "memory", dir: -1 };
 
   async function draw() {
     const d = await api(`/api/server/processes?sort=${isCpu ? "cpu" : "memory"}`);
     const keepFocus = document.activeElement?.id === "filter";
-    const rows = d.processes.filter((p) => !filter || `${p.name} ${p.command} ${p.owner} ${p.user}`.toLowerCase().includes(filter));
+    const rows = d.processes
+      .filter((p) => !filter || `${p.name} ${p.command} ${p.owner} ${p.user}`.toLowerCase().includes(filter))
+      .sort((x, y) => compare(x[sort.key], y[sort.key]) * sort.dir)
+      .slice(0, 100);
+    const th = (key, label, right) => `<th class="sortable ${sort.key === key ? "on" : ""}" data-sort="${key}" ${right ? 'style="text-align:right"' : ""}>
+      ${label}<span class="arrow">${sort.key === key ? (sort.dir < 0 ? "↓" : "↑") : ""}</span></th>`;
 
     view.innerHTML = `
       <a href="#/system" class="btn" style="border:0;padding-left:0;margin-top:8px">${icon("back")} System</a>
@@ -18,12 +25,12 @@ export async function processesScreen(view, kind) {
       </div>
       ${isCpu ? cpuTop(d) : memTop(d)}
       <div class="row spread" style="margin:22px 0 10px">
-        <b>Top processes by ${isCpu ? "CPU" : "memory"}</b>
+        <b>Processes <span class="muted" style="font-weight:400">(top 100)</span></b>
         <input id="filter" placeholder="Filter…" value="${esc(filter)}" style="max-width:220px">
       </div>
       <div class="card scroll">
         <table>
-          <tr><th>Process</th><th>Belongs to</th><th style="text-align:right">CPU</th><th style="text-align:right">Memory</th><th>User</th><th>PID</th></tr>
+          <tr>${th("name", "Process")}${th("owner", "Belongs to")}${th("cpu", "CPU", true)}${th("memory", "Memory", true)}${th("user", "User")}${th("pid", "PID")}</tr>
           ${rows.map((p) => `
             <tr>
               <td style="max-width:420px"><b>${esc(p.name)}</b><div class="note" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(p.command)}">${esc(p.command)}</div></td>
@@ -37,6 +44,12 @@ export async function processesScreen(view, kind) {
       </div>
       <p class="note" style="margin-top:8px">${isCpu ? "CPU is measured over the last second. 100% = one full core." : "Memory is the real memory each process uses (RSS)."}</p>`;
 
+    view.querySelectorAll("[data-sort]").forEach((h) => (h.onclick = () => {
+      const key = h.dataset.sort;
+      // Numbers start biggest-first, text starts A→Z.
+      sort = sort.key === key ? { key, dir: -sort.dir } : { key, dir: ["cpu", "memory"].includes(key) ? -1 : 1 };
+      clearTimeout(timer); draw();
+    }));
     const input = view.querySelector("#filter");
     input.oninput = () => { filter = input.value.toLowerCase(); clearTimeout(timer); draw(); };
     if (keepFocus) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
@@ -46,6 +59,10 @@ export async function processesScreen(view, kind) {
   await draw();
   return () => clearTimeout(timer);
 }
+
+// Numbers by value, text alphabetically (empty last).
+const compare = (a, b) =>
+  typeof a === "number" ? a - b : !a ? 1 : !b ? -1 : String(a).localeCompare(String(b), undefined, { sensitivity: "base" });
 
 // Small inline bar next to a number.
 const bar = (v, max) => `<span class="minibar"><i style="width:${Math.min(100, (v / (max || 1)) * 100)}%"></i></span>`;

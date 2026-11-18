@@ -202,3 +202,6 @@ a.stat.link:hover { border-color: var(--accent); }
 .minibar i { display: block; height: 100%; background: var(--accent); }
 .stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--line); margin-top: 12px; }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.sortable:hover, th.sortable.on { color: var(--ink); }
+th .arrow { display: inline-block; width: 12px; margin-left: 4px; color: var(--accent); }

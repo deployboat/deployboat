@@ -64,7 +64,7 @@ function owner(cgroup: string, names: Map<string, string>) {
   return "";
 }
 
-export async function sample(sortBy: "cpu" | "memory", limit = 60) {
+export async function sample(sortBy: "cpu" | "memory", limit = 2000) {
   const a = snapshot(), coresA = coreTicks();
   await new Promise((r) => setTimeout(r, 1000));
   const b = snapshot(), coresB = coreTicks();
