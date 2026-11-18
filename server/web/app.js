@@ -132,15 +132,22 @@ async function render() {
   const box = document.createElement("div");
   view.replaceChildren(box);
 
+  // Show a spinner if the page takes more than a moment. The screen replaces it when ready.
+  const spinner = setTimeout(() => {
+    if (id === current && !box.innerHTML) box.innerHTML = `<div class="loading"><span class="spinner"></span>Loading…</div>`;
+  }, 120);
+
   try {
     let stop;
     if (page === "settings") stop = await settingsScreen(box);
     else if (page === "server") stop = await serverScreen(box);
     else if (page === "apps" && name) stop = await appScreen(box, decodeURIComponent(name), tab || "overview");
     else stop = await appsScreen(box);
+    clearTimeout(spinner);
     if (id === current) cleanup = stop ?? (() => {});
     else stop?.(); // we already moved on: stop its timers right away
   } catch (e) {
+    clearTimeout(spinner);
     if (id === current && e.message !== "Logged out") box.innerHTML = `<div class="card pad">${esc(e.message)}</div>`;
   }
 }

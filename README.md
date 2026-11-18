@@ -132,4 +132,4 @@ Keep it simple. If a change needs a long explanation, it's probably too clever.
 
 ## License
 
-MIT
+[MIT](LICENSE)
