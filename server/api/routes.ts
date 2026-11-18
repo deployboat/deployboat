@@ -13,11 +13,15 @@ import { server } from "./server.ts";
 import { git } from "./git.ts";
 import { doctor } from "./doctor.ts";
 import { backups } from "./backups.ts";
+import { hooks } from "./hooks.ts";
 import { agentPrompt, agentGuide } from "./agent.ts";
 import { resolveName, db } from "../lib/db.ts";
 import { isService } from "../services/index.ts";
 
 export const app = new Hono();
+
+// Git webhooks (no token: the secret is in the address).
+app.route("/hooks", hooks);
 
 // Login (no token needed for these two).
 app.post("/auth/login", login);

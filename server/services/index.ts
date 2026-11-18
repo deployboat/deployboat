@@ -2,8 +2,8 @@
 // Nothing is added automatically. The user (dashboard) or their AI agent asks for it.
 // Once added, every deploy makes sure it still exists.
 //
-// To add a service: create a folder with index.ts exporting enabled(), provision()
-// and rename(), then list it here.
+// To add a service: create a folder with index.ts exporting enabled(), provision(),
+// rename() and destroy(), then list it here.
 import * as postgres from "./postgres/index.ts";
 import * as files from "./files/index.ts";
 
@@ -26,4 +26,13 @@ export async function addService(app: string, service: ServiceName, log: (l: str
 
 export async function renameServices(oldApp: string, newApp: string) {
   for (const s of Object.values(SERVICES)) await s.rename(oldApp, newApp);
+}
+
+// Remove a service and delete its data.
+export async function removeService(app: string, service: ServiceName) {
+  await SERVICES[service].destroy(app);
+}
+
+export async function removeAllServices(app: string) {
+  for (const s of Object.values(SERVICES)) await s.destroy(app);
 }

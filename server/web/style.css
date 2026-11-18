@@ -210,3 +210,13 @@ th .arrow { display: inline-block; width: 12px; margin-left: 4px; color: var(--a
 .devcode { font: 700 28px/1.2 var(--mono); letter-spacing: .12em; margin: 14px 0; display: flex; gap: 12px; justify-content: center; align-items: center; }
 details.guide summary { cursor: pointer; }
 @media (max-width: 760px) { .stats > [style*="span 2"] { grid-column: auto !important; } }
+
+/* switches, banners */
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; }
+.switch input { display: none; }
+.switch span { width: 34px; height: 20px; border-radius: 99px; background: var(--line); position: relative; transition: background .15s; flex-shrink: 0; }
+.switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgb(0 0 0 / .2); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(14px); }
+.banner { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; background: var(--soft); border-color: transparent; font-size: 14px; flex-wrap: wrap; }
+.banner a { color: var(--accent); }

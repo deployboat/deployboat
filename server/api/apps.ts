@@ -6,7 +6,9 @@ import { appUrl } from "../deploy/index.ts";
 import { containerState, appLogs, restart, remove, currentImage, activate, rename, stop, resume } from "../deploy/manage.ts";
 import { filesHost, bucketName, usage } from "../services/files/index.ts";
 import { tables } from "../services/postgres/index.ts";
-import { getGit } from "../deploy/git.ts";
+import { getGit, webhookSecret, setGitOptions } from "../deploy/git.ts";
+import { previewsOf } from "../deploy/previews.ts";
+import { backupNow } from "../backups/index.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
 import { resolveName, isStopped, displayName } from "../lib/db.ts";
 import { domainsOf, domainOwner, addDomain, removeDomain, validHost, dnsReady } from "../lib/domains.ts";
@@ -15,7 +17,7 @@ import { config } from "../lib/config.ts";
 import { share } from "./share.ts";
 import { isAdmin } from "./auth.ts";
 import { crons } from "./crons.ts";
-import { enabledServices, addService, isService } from "../services/index.ts";
+import { enabledServices, addService, removeService, isService } from "../services/index.ts";
 
 export const apps = new Hono();
 
@@ -35,12 +37,29 @@ apps.use("/:name/*", async (c, next) => {
 apps.route("/", share);
 apps.route("/", crons);
 
+// Git details for the dashboard, including the webhook address for auto-deploy.
+function gitInfo(name: string) {
+  const g = getGit(name);
+  if (!g?.repo) return null;
+  return {
+    repo: g.repo, branch: g.branch, autoDeploy: !!g.auto_deploy, previews: !!g.previews, isPreview: !!g.ref,
+    webhookUrl: `https://${config.dashboardHost}/hooks/${name}/${webhookSecret(name)}`,
+    previewApps: previewsOf(name),
+  };
+}
+
+const previewInfo = (name: string) => {
+  const r = db.prepare("SELECT preview_of, pr FROM apps WHERE name = ?").get(name) as { preview_of: string | null; pr: number | null } | undefined;
+  return { previewOf: r?.preview_of ?? null, pr: r?.pr ?? null };
+};
+
 apps.get("/", async (c) => {
   const rows = db.prepare("SELECT name FROM apps ORDER BY name").all() as { name: string }[];
   const list = await Promise.all(rows.map(async ({ name }) => ({
     name,
     displayName: displayName(name),
     url: appUrl(name),
+    previewOf: previewInfo(name).previewOf,
     state: await containerState(name),
     building: isBusy(name),
     stopped: isStopped(name),
@@ -65,7 +84,8 @@ apps.get("/:name", async (c) => {
     state: await containerState(name),
     building: isBusy(name),
     stopped: isStopped(name),
-    git: getGit(name)?.repo ? { repo: getGit(name)!.repo, branch: getGit(name)!.branch } : null,
+    git: gitInfo(name),
+    ...previewInfo(name),
     deploys,
   });
 });
@@ -211,6 +231,41 @@ apps.post("/:name/services/:service", async (c) => {
     await addService(name, service);
     await syncRoutes();
     await restart(name).catch(() => {}); // fine if it was never deployed
+    return c.json({ ok: true, services: enabledServices(name) });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 500);
+  } finally {
+    unlock(name);
+  }
+});
+
+// Auto-deploy and PR preview switches; reset the webhook secret.
+apps.put("/:name/git", async (c) => {
+  const name = c.req.param("name");
+  if (!getGit(name)?.repo) return c.json({ error: "This app isn't connected to a Git repo." }, 400);
+  const b = await c.req.json().catch(() => ({}));
+  setGitOptions(name, { autoDeploy: b.autoDeploy, previews: b.previews, resetSecret: !!b.resetSecret });
+  return c.json({ ok: true, git: gitInfo(name) });
+});
+
+// Remove a database or storage and DELETE its data. A last backup is made first.
+apps.delete("/:name/services/:service", async (c) => {
+  const { name, service } = c.req.param();
+  if (!isService(service)) return c.json({ error: "Use database or storage." }, 400);
+  if (!enabledServices(name).includes(service)) return c.json({ ok: true, services: enabledServices(name) });
+  if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
+  const isPreview = !!previewInfo(name).previewOf;
+  if (!isPreview) {
+    try { await backupNow(name); }
+    catch (e) { return c.json({ error: `Couldn't make a last backup, so nothing was deleted: ${(e as Error).message}` }, 409); }
+    const last = db.prepare("SELECT status, note FROM backups WHERE app = ? ORDER BY id DESC LIMIT 1").get(name) as { status: string; note: string } | undefined;
+    if (last?.status !== "done") return c.json({ error: `The last backup failed, so nothing was deleted. ${last?.note ?? ""}` }, 409);
+  }
+  lock(name);
+  try {
+    await removeService(name, service);
+    await syncRoutes();
+    await restart(name).catch(() => {});
     return c.json({ ok: true, services: enabledServices(name) });
   } catch (e) {
     return c.json({ error: (e as Error).message }, 500);

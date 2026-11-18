@@ -9,11 +9,10 @@ import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, readFileSy
 import { dirname, join, relative } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { config } from "../lib/config.ts";
-import { getEnv } from "../lib/env.ts";
 import { run } from "../lib/shell.ts";
 import * as s3 from "../lib/s3.ts";
 import { enabled as hasDatabase } from "../services/postgres/index.ts";
-import { enabled as hasStorage } from "../services/files/index.ts";
+import { enabled as hasStorage, clientFor as storageOf } from "../services/files/index.ts";
 
 const dbName = (app: string) => "app_" + app.replace(/-/g, "_");
 
@@ -30,13 +29,6 @@ function pipeCmd(cmd: string, args: string[], io: { out?: string; in?: string })
   const streamed = io.out ? pipeline(child.stdout!, createWriteStream(io.out))
     : io.in ? pipeline(createReadStream(io.in), child.stdin!) : Promise.resolve();
   return Promise.all([exited, streamed]).then(() => {});
-}
-
-// The app's storage, reached from this server (the host can talk to the container directly).
-async function storageOf(app: string): Promise<s3.S3> {
-  const ip = await run("docker", ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", "garage"]);
-  const env = getEnv(app);
-  return { endpoint: `http://${ip}:3900`, region: "garage", bucket: env.S3_BUCKET, accessKey: env.S3_ACCESS_KEY, secretKey: env.S3_SECRET_KEY };
 }
 
 export const hasData = (app: string) => hasDatabase(app) || hasStorage(app);

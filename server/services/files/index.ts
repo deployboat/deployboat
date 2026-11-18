@@ -4,7 +4,8 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../../lib/config.ts";
-import { getEnv, setEnv } from "../../lib/env.ts";
+import { getEnv, setEnv, deleteEnv } from "../../lib/env.ts";
+import * as s3 from "../../lib/s3.ts";
 import { run } from "../../lib/shell.ts";
 
 const CONTAINER = "garage";
@@ -132,4 +133,26 @@ export async function rename(oldApp: string, newApp: string) {
   await garage("bucket", "unalias", bucketName(oldApp)).catch(() => {});
   setEnv(newApp, "S3_BUCKET", bucketName(newApp));
   setEnv(newApp, "S3_PUBLIC_URL", `https://${filesHost(newApp)}`);
+}
+
+// An S3 client for the app's own bucket, from this server (the host can reach the container directly).
+export async function clientFor(app: string): Promise<s3.S3> {
+  const ip = await run("docker", ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", CONTAINER]);
+  const env = getEnv(app);
+  return { endpoint: `http://${ip}:3900`, region: "garage", bucket: env.S3_BUCKET, accessKey: env.S3_ACCESS_KEY, secretKey: env.S3_SECRET_KEY };
+}
+
+const VARS = ["S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_PUBLIC_URL",
+  "AWS_ENDPOINT_URL_S3", "AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
+  "AWS_REQUEST_CHECKSUM_CALCULATION", "AWS_RESPONSE_CHECKSUM_VALIDATION"];
+
+// Delete every file, the bucket and its key. The files are gone after this.
+export async function destroy(app: string) {
+  if (!enabled(app)) return;
+  const env = getEnv(app);
+  const client = await clientFor(app);
+  for (const obj of await s3.list(client)) await s3.remove(client, obj.key);
+  await garage("bucket", "delete", "--yes", env.S3_BUCKET).catch(() => {});
+  await garage("key", "delete", "--yes", env.S3_ACCESS_KEY).catch(() => {});
+  for (const k of VARS) deleteEnv(app, k);
 }

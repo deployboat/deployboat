@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../../lib/config.ts";
-import { getEnv, setEnv } from "../../lib/env.ts";
+import { getEnv, setEnv, deleteEnv } from "../../lib/env.ts";
 import { run } from "../../lib/shell.ts";
 
 const CONTAINER = "postgres";
@@ -86,4 +86,14 @@ export async function rename(oldApp: string, newApp: string) {
   const password = secret();
   await sql(`ALTER ROLE ${to} PASSWORD '${password}'`);
   setEnv(newApp, "DATABASE_URL", `postgres://${to}:${password}@${CONTAINER}:5432/${to}`);
+}
+
+// Delete the app's database and user. The data is gone after this.
+export async function destroy(app: string) {
+  if (!enabled(app)) return;
+  const name = "app_" + app.replace(/-/g, "_");
+  await sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${name}'`).catch(() => {});
+  await sql(`DROP DATABASE IF EXISTS ${name}`);
+  await sql(`DROP ROLE IF EXISTS ${name}`);
+  deleteEnv(app, "DATABASE_URL");
 }

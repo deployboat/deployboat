@@ -1,21 +1,13 @@
 // New app from Git, deploy keys, redeploy. Deploys run in the background;
 // the dashboard follows progress on the app's Versions page.
 import { Hono } from "hono";
-import { isBusy, lock, unlock } from "../lib/lock.ts";
+import { isBusy } from "../lib/lock.ts";
 import { resolveName } from "../lib/db.ts";
-import { deploy } from "../deploy/index.ts";
-import { ensureKey, saveRepo, validRepo, fetchSource, getGit } from "../deploy/git.ts";
+import { ensureKey, saveRepo, validRepo, getGit, queueDeploy } from "../deploy/git.ts";
 
 export const git = new Hono();
 
 const validName = (n: string) => /^[a-z0-9][a-z0-9-]{0,40}$/.test(n);
-
-function startDeploy(name: string) {
-  lock(name);
-  deploy(name, (log) => fetchSource(name, log))
-    .catch(() => {}) // the error is already in the deploy log
-    .finally(() => unlock(name));
-}
 
 // The public key to add to a private repo.
 git.post("/key", async (c) => {
@@ -36,7 +28,7 @@ git.post("/deploy", async (c) => {
   if (isBusy(name)) return c.json({ error: `${name} is already deploying.` }, 409);
 
   saveRepo(name, repo, branch);
-  startDeploy(name);
+  queueDeploy(name, "→ Deploying from Git");
   return c.json({ ok: true, name });
 });
 
@@ -45,6 +37,6 @@ git.post("/redeploy/:name", (c) => {
   const name = c.req.param("name");
   if (!getGit(name)?.repo) return c.json({ error: "This app isn't connected to a Git repo." }, 400);
   if (isBusy(name)) return c.json({ error: `${name} is already deploying.` }, 409);
-  startDeploy(name);
+  queueDeploy(name, "→ Redeploy started from the dashboard");
   return c.json({ ok: true });
 });

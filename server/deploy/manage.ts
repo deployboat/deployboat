@@ -3,7 +3,7 @@ import { db, setStopped } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName, start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
-import { renameServices } from "../services/index.ts";
+import { renameServices, removeAllServices } from "../services/index.ts";
 import "./git.ts"; // makes sure the git table exists
 import "../lib/domains.ts"; // and the domains table
 import "../lib/share.ts"; // and the share table
@@ -37,6 +37,11 @@ export async function activate(app: string, image: string) {
 
 // Remove the app and its address. Its database and files are kept on purpose.
 export async function remove(app: string) {
+  // Previews of this app go too, with their (throwaway) data.
+  for (const { name } of db.prepare("SELECT name FROM apps WHERE preview_of = ?").all(app) as { name: string }[]) {
+    await removeAllServices(name).catch(() => {});
+    await remove(name);
+  }
   await run("docker", ["rm", "-f", containerName(app)]).catch(() => {});
   db.prepare("DELETE FROM apps WHERE name = ?").run(app);
   db.prepare("DELETE FROM deploys WHERE app = ?").run(app);
@@ -62,6 +67,7 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("UPDATE share SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE crons SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE backups SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE apps SET preview_of = ? WHERE preview_of = ?").run(newName, oldName);
   db.prepare("UPDATE aliases SET name = ? WHERE name = ?").run(newName, oldName);
   db.prepare("DELETE FROM aliases WHERE old = ?").run(newName);
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);

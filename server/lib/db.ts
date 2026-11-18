@@ -40,3 +40,7 @@ export const isStopped = (app: string) =>
 try { db.exec("ALTER TABLE apps ADD COLUMN display_name TEXT"); } catch { /* already there */ }
 export const displayName = (app: string) =>
   (db.prepare("SELECT display_name FROM apps WHERE name = ?").get(app) as { display_name: string | null } | undefined)?.display_name || app;
+
+// Added later: preview apps (one per pull request) point to their main app.
+try { db.exec("ALTER TABLE apps ADD COLUMN preview_of TEXT"); } catch { /* already there */ }
+try { db.exec("ALTER TABLE apps ADD COLUMN pr INTEGER"); } catch { /* already there */ }

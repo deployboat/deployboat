@@ -82,6 +82,8 @@ function headerActions(view, base, app) {
 
 function overview(box, base, app) {
   box.innerHTML = `
+    ${app.previewOf ? `<div class="card pad banner">${icon("git")} Preview of <a href="#/apps/${encodeURIComponent(app.previewOf)}">${esc(app.previewOf)}</a> for pull request #${app.pr}.
+      It's deleted, with its data, when the pull request is closed or merged.</div>` : ""}
     <div class="card pad">
       <dl class="info">
         <dt>Address</dt><dd><a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></dd>
@@ -92,8 +94,10 @@ function overview(box, base, app) {
         ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
       </dl>
     </div>
-    ${app.git ? `<div class="row" style="margin-top:14px"><button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button></div>` : ""}`;
+    ${app.git ? `<div class="row" style="margin-top:14px"><button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button></div>` : ""}
+    ${app.git && !app.git.isPreview ? autoDeployCard(app.git) : ""}`;
 
+  wireAutoDeploy(box, base, app);
   box.querySelector("#redeploy")?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;
     try {
@@ -102,6 +106,50 @@ function overview(box, base, app) {
       location.hash = `#/apps/${encodeURIComponent(app.name)}/versions`;
     } catch (err) { toast(err.message); }
   });
+}
+
+// Auto-deploy on push + pull request previews, with the webhook address to paste into GitHub etc.
+function autoDeployCard(g) {
+  return `
+    <div class="card pad" style="margin-top:14px">
+      <div class="row spread"><b>Auto-deploy</b>
+        <label class="switch"><input type="checkbox" id="auto" ${g.autoDeploy ? "checked" : ""}><span></span> Deploy on every push to <code>${esc(g.branch)}</code></label></div>
+      <p class="muted" style="font-size:13px;margin:6px 0 10px">Add this webhook address to your repo once. Keep it secret.</p>
+      <div class="row" style="flex-wrap:nowrap"><input readonly value="${esc(g.webhookUrl)}" class="secret" id="hookurl">
+        <button class="btn" id="cphook">${icon("copy")}</button><button class="btn" id="resethook" title="Make a new address">${icon("restart")}</button></div>
+      <details class="guide" style="margin-top:10px">
+        <summary class="note">Where do I paste it?</summary>
+        <ul class="will" style="margin-top:8px;font-size:13.5px">
+          <li><b>GitHub:</b> repo → Settings → Webhooks → Add webhook. Paste it as the Payload URL, content type <code>application/json</code>, choose "Let me select individual events" → <b>Pushes</b> and <b>Pull requests</b>.</li>
+          <li><b>GitLab:</b> project → Settings → Webhooks. Paste the URL, tick <b>Push events</b> and <b>Merge request events</b>.</li>
+          <li><b>Gitea / Forgejo:</b> repo → Settings → Webhooks → Add → Gitea. Paste the URL, choose push and pull request events.</li>
+          <li><b>Bitbucket:</b> repo → Repository settings → Webhooks → Add. Paste the URL, trigger: Repository push.</li>
+        </ul>
+      </details>
+      <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+      <div class="row spread"><b>Pull request previews</b>
+        <label class="switch"><input type="checkbox" id="prev" ${g.previews ? "checked" : ""}><span></span> Preview every pull request</label></div>
+      <p class="muted" style="font-size:13px;margin-top:6px">Each pull request gets its own address${" "}(and its own empty database/storage if this app has them).
+        Deleted when the pull request closes. GitHub, GitLab and Gitea. Pull requests from forks are ignored for safety.</p>
+      ${g.previewApps.length ? `<div class="row" style="margin-top:10px;gap:6px">${g.previewApps.map((p) =>
+        `<a class="btn" href="#/apps/${encodeURIComponent(p.name)}">#${p.pr}</a>`).join("")}</div>` : ""}
+    </div>`;
+}
+
+function wireAutoDeploy(box, base, app) {
+  if (!app.git || app.git.isPreview) return;
+  const save = async (body, msg) => {
+    try { const r = await api(`${base}/git`, { method: "PUT", body }); toast(msg); return r.git; }
+    catch (err) { toast(err.message); }
+  };
+  box.querySelector("#auto").onchange = (e) => save({ autoDeploy: e.target.checked }, e.target.checked ? "Auto-deploy on" : "Auto-deploy off");
+  box.querySelector("#prev").onchange = (e) => save({ previews: e.target.checked }, e.target.checked ? "Previews on" : "Previews off");
+  box.querySelector("#cphook").onclick = () => copy(box.querySelector("#hookurl").value);
+  box.querySelector("#resethook").onclick = async () => {
+    if (!confirm("Make a new webhook address? The old one stops working, so update it in your repo settings.")) return;
+    const g = await save({ resetSecret: true }, "New address created");
+    if (g) box.querySelector("#hookurl").value = g.webhookUrl;
+  };
 }
 
 // App settings: name, delete. (The address is on the Domains page.)
@@ -319,6 +367,29 @@ async function variables(box, base) {
   }));
 }
 
+// Danger zone at the bottom of the Database / Storage page.
+function removeServiceBox(box, base, app, service) {
+  const db = service === "database";
+  const el = document.createElement("div");
+  el.className = "card pad danger-zone";
+  el.style.marginTop = "14px";
+  el.innerHTML = `
+    <b>Delete ${db ? "database" : "storage"}</b>
+    <p class="muted" style="font-size:13px;margin:2px 0 10px">${app.previewOf ? "Deletes this preview's data." :
+      `Deletes ${db ? "every table and row" : "every stored file"}. A last backup is made first, so you can restore it from Backups.`}
+      The app restarts without ${db ? "<code>DATABASE_URL</code>" : "the <code>S3_*</code> variables"}.</p>
+    <button class="btn danger">${icon("trash")} Delete ${db ? "database" : "storage"}</button>`;
+  box.append(el);
+  el.querySelector("button").onclick = async (e) => {
+    const typed = prompt(`This deletes ${app.displayName}'s ${db ? "database" : "stored files"}.\n\nType the app address name (${app.name}) to confirm:`);
+    if (typed !== app.name) { if (typed !== null) toast("Name didn't match. Nothing deleted."); return; }
+    const b = e.currentTarget;
+    b.disabled = true; b.innerHTML = `<span class="spinner" style="width:14px;height:14px"></span> Backing up and deleting…`;
+    try { await api(`${base}/services/${service}`, { method: "DELETE" }); toast("Deleted"); dispatchEvent(new HashChangeEvent("hashchange")); }
+    catch (err) { toast(err.message); b.disabled = false; b.textContent = `Delete ${db ? "database" : "storage"}`; }
+  };
+}
+
 // Shown when an app hasn't added a service yet.
 function addServicePage(box, base, service) {
   const db = service === "database";
@@ -359,6 +430,7 @@ async function database(box, base, app) {
       || `<div class="muted">No tables yet. They appear here when your app creates them.</div>`}
     </div>`;
   wireFields(box);
+  removeServiceBox(box, base, app, "database");
 }
 
 async function storage(box, base, app) {
@@ -382,4 +454,5 @@ async function storage(box, base, app) {
         <code>${esc(s.publicUrl)}/&lt;file&gt;</code>. In S3 SDKs set <code>forcePathStyle: true</code>.</p>
     </div>`;
   wireFields(box);
+  removeServiceBox(box, base, app, "storage");
 }
