@@ -50,10 +50,14 @@ export async function requireLogin(c: Context, next: Next) {
 
 export const isAdmin = (c: Context) => c.get("role") === "admin";
 
+// Keep this browser logged in with the (new) main token.
+export const setLoginCookie = (c: Context) =>
+  setCookie(c, COOKIE, config.token, { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: 60 * 60 * 24 * 30 });
+
 export async function login(c: Context) {
   const { token } = await c.req.json().catch(() => ({ token: "" }));
   if (!same(String(token ?? "").trim(), config.token)) return c.json({ error: "That token is not correct." }, 401);
-  setCookie(c, COOKIE, config.token, { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: 60 * 60 * 24 * 30 });
+  setLoginCookie(c);
   return c.json({ ok: true });
 }
 

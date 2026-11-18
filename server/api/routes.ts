@@ -2,11 +2,11 @@
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { config } from "../lib/config.ts";
+import { config, resetMainToken } from "../lib/config.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
 import { deploy } from "../deploy/index.ts";
 import { extract } from "../deploy/extract.ts";
-import { requireLogin, login, logout } from "./auth.ts";
+import { requireLogin, login, logout, setLoginCookie } from "./auth.ts";
 import { tokens } from "./tokens.ts";
 import { apps } from "./apps.ts";
 import { server } from "./server.ts";
@@ -39,6 +39,14 @@ app.get("/api/resolve/:name", (c) => {
 app.get("/api/settings", (c) =>
   c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain }),
 );
+
+// New main token. Other browsers and anything using the old token are logged out.
+// Agent tokens keep working. (Agent tokens can't call this: see api/auth.ts.)
+app.post("/api/settings/reset-token", (c) => {
+  resetMainToken();
+  setLoginCookie(c); // keep *this* browser logged in
+  return c.json({ token: config.token });
+});
 
 // Upload a .tar.gz of the project. Response streams the build log.
 app.post("/api/deploy/:name", async (c) => {

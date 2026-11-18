@@ -23,3 +23,11 @@ export const config = {
   dashboardHost: `deployboat.${process.env.BASE_DOMAIN ?? `${publicIp}.nip.io`}`,
   dockerNetwork: "deployboat",
 };
+
+// Make a new main token. The old one stops working right away.
+export function resetMainToken() {
+  const token = "dbt_" + randomBytes(24).toString("hex");
+  writeFileSync(tokenFile, token, { mode: 0o600 });
+  config.token = token;
+  return token;
+}

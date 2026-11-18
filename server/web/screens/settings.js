@@ -11,6 +11,8 @@ export async function settingsScreen(view) {
         <p class="muted" style="margin:2px 0 10px">Full access, for logging in to this dashboard. Don't paste it into AI tools: use an agent token instead.</p>
         <div class="row"><input readonly type="password" value="${esc(s.token)}" id="tok" class="secret">
           <button class="btn" id="show">Show</button><button class="btn" id="ct">${icon("copy")}</button></div>
+        <button class="btn danger" id="reset" style="margin-top:10px">${icon("restart")} Reset main token</button>
+        <span class="note">Use this if it leaked. Agent tokens keep working.</span>
       </div>
       <div>
         <div class="row spread"><b>Agent tokens</b><button class="btn" id="newtok">${icon("plus")} New token</button></div>
@@ -25,6 +27,17 @@ export async function settingsScreen(view) {
     </div>`;
 
   view.querySelector("#ct").onclick = () => copy(s.token);
+  view.querySelector("#reset").onclick = async () => {
+    if (!confirm("Make a new main token?\n\nThe old one stops working right away. Other browsers are logged out, and any computer logged in with the main token must log in again. You stay logged in here.")) return;
+    try {
+      const r = await api("/api/settings/reset-token", { method: "POST" });
+      s.token = r.token;
+      const t = view.querySelector("#tok");
+      t.value = r.token; t.type = "text";
+      view.querySelector("#show").textContent = "Hide";
+      toast("New main token created. Save it somewhere safe.");
+    } catch (err) { toast(err.message); }
+  };
   view.querySelector("#show").onclick = (e) => {
     const t = view.querySelector("#tok");
     t.type = t.type === "password" ? "text" : "password";
