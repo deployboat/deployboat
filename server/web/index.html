@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deploy Boat</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M16 4v18' stroke='%2318181b' stroke-width='2'/><path d='M17 5l9 14h-9z' fill='%232563eb'/><path d='M5 23h22l-4 5H9z' fill='%2318181b'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="top" id="top" hidden>
+    <a href="#/" class="logo">
+      <svg viewBox="0 0 32 32"><path d="M16 4v18" stroke="currentColor" stroke-width="2"/><path d="M17 5l9 14h-9z" fill="var(--accent)"/><path d="M5 23h22l-4 5H9z" fill="currentColor"/></svg>
+      Deploy Boat
+    </a>
+    <nav>
+      <a href="#/" data-nav="apps">Apps</a>
+      <a href="#/settings" data-nav="settings">Settings</a>
+      <button class="link" id="logout">Log out</button>
+    </nav>
+  </header>
+  <main id="view"></main>
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

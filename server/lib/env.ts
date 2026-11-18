@@ -18,3 +18,10 @@ export function getEnv(app: string): Record<string, string> {
 export function setEnv(app: string, key: string, value: string) {
   db.prepare("INSERT OR REPLACE INTO env (app, key, value) VALUES (?, ?, ?)").run(app, key, value);
 }
+
+export function deleteEnv(app: string, key: string) {
+  db.prepare("DELETE FROM env WHERE app = ? AND key = ?").run(app, key);
+}
+
+// Values created by built-in services. Shown in the dashboard, but not editable.
+export const isBuiltin = (key: string) => /^(DATABASE_URL|S3_|AWS_)/.test(key);

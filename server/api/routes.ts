@@ -1,28 +1,27 @@
-// HTTP routes. Keep them thin: check input, call deploy/.
+// All HTTP routes. Keep them thin: check input, call deploy/ or services/.
 import { Hono } from "hono";
 import { streamText } from "hono/streaming";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { config } from "../lib/config.ts";
-import { db } from "../lib/db.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
-import { deploy, appUrl } from "../deploy/index.ts";
+import { deploy } from "../deploy/index.ts";
 import { extract } from "../deploy/extract.ts";
+import { requireLogin, login, logout } from "./auth.ts";
+import { apps } from "./apps.ts";
 
 export const app = new Hono();
 
-app.get("/", (c) => c.text("Deploy Boat is running. Dashboard coming soon."));
+// Login (no token needed for these two).
+app.post("/auth/login", login);
+app.post("/auth/logout", logout);
 
-// Every /api route needs the token.
-app.use("/api/*", async (c, next) => {
-  if (c.req.header("authorization") !== `Bearer ${config.token}`) {
-    return c.json({ error: "Wrong or missing token. Run: deployboat login" }, 401);
-  }
-  await next();
-});
+// Everything under /api needs the token.
+app.use("/api/*", requireLogin);
+app.route("/api/apps", apps);
 
-app.get("/api/apps", (c) => {
-  const apps = db.prepare("SELECT name FROM apps ORDER BY name").all() as { name: string }[];
-  return c.json(apps.map((a) => ({ name: a.name, url: appUrl(a.name) })));
-});
+app.get("/api/settings", (c) =>
+  c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain }),
+);
 
 // Upload a .tar.gz of the project. Response streams the build log.
 app.post("/api/deploy/:name", async (c) => {
@@ -53,3 +52,7 @@ app.post("/api/deploy/:name", async (c) => {
     }
   });
 });
+
+// Dashboard: plain files from web/. Unknown paths fall back to index.html.
+app.use("/*", serveStatic({ root: "./web" }));
+app.get("*", serveStatic({ path: "./web/index.html" }));
