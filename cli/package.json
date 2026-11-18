@@ -1,0 +1,8 @@
+{
+  "name": "deployboat",
+  "version": "0.1.0",
+  "description": "Publish any project to your Deploy Boat server.",
+  "type": "module",
+  "bin": { "deployboat": "index.js" },
+  "engines": { "node": ">=20" }
+}
