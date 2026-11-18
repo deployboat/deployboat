@@ -205,3 +205,8 @@ a.stat.link:hover { border-color: var(--accent); }
 th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 th.sortable:hover, th.sortable.on { color: var(--ink); }
 th .arrow { display: inline-block; width: 12px; margin-left: 4px; color: var(--accent); }
+
+/* backups */
+.devcode { font: 700 28px/1.2 var(--mono); letter-spacing: .12em; margin: 14px 0; display: flex; gap: 12px; justify-content: center; align-items: center; }
+details.guide summary { cursor: pointer; }
+@media (max-width: 760px) { .stats > [style*="span 2"] { grid-column: auto !important; } }

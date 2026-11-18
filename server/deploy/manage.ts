@@ -8,6 +8,7 @@ import "./git.ts"; // makes sure the git table exists
 import "../lib/domains.ts"; // and the domains table
 import "../lib/share.ts"; // and the share table
 import { removeCrons } from "../crons/index.ts";
+import "../backups/index.ts"; // makes sure the backups table exists
 
 // "running", "exited", "restarting"… or "missing" if there's no container.
 export const containerState = (app: string) =>
@@ -60,6 +61,7 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("UPDATE domains SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE share SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE crons SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE backups SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE aliases SET name = ? WHERE name = ?").run(newName, oldName);
   db.prepare("DELETE FROM aliases WHERE old = ?").run(newName);
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);

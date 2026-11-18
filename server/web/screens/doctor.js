@@ -33,7 +33,7 @@ export async function doctorScreen(view) {
             <div>${esc(i.message)}</div>
             ${i.detail ? `<div class="note">${esc(i.detail)}</div>` : ""}
           </div>
-          ${i.link ? `<a class="btn" href="${esc(i.link)}">See logs</a>` : ""}
+          ${i.link ? `<a class="btn" href="${esc(i.link)}">${i.link.includes("/logs") ? "See logs" : "Open"}</a>` : ""}
           ${i.fix ? `<button class="btn ${i.status === "bad" ? "primary" : ""}" data-fix="${esc(i.id)}" ${r.fixing ? "disabled" : ""}>${esc(i.fix)}</button>` : ""}
         </div>`).join("")}
       </div>
