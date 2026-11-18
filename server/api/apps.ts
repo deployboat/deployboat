@@ -3,10 +3,11 @@ import { Hono } from "hono";
 import { db } from "../lib/db.ts";
 import { getEnv, setEnv, deleteEnv, isBuiltin } from "../lib/env.ts";
 import { appUrl } from "../deploy/index.ts";
-import { containerState, appLogs, restart, remove, currentImage, activate } from "../deploy/manage.ts";
+import { containerState, appLogs, restart, remove, currentImage, activate, rename } from "../deploy/manage.ts";
 import { filesHost, bucketName, usage } from "../services/files/index.ts";
 import { tables } from "../services/postgres/index.ts";
-import { isBusy } from "../lib/lock.ts";
+import { isBusy, lock, unlock } from "../lib/lock.ts";
+import { resolveName } from "../lib/db.ts";
 
 export const apps = new Hono();
 
@@ -121,4 +122,19 @@ apps.get("/:name/storage", async (c) => {
     secretKey: env.S3_SECRET_KEY ?? null,
     ...(await usage(name)),
   });
+});
+
+apps.post("/:name/rename", async (c) => {
+  const name = c.req.param("name");
+  const { newName: raw } = await c.req.json().catch(() => ({}));
+  const newName = String(raw ?? "").trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{0,40}$/.test(newName)) return c.json({ error: "Use letters, numbers and dashes only." }, 400);
+  if (newName === name) return c.json({ ok: true, name });
+  if (exists(newName) || resolveName(newName) !== newName) return c.json({ error: `The name ${newName} is already used.` }, 409);
+  if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
+
+  lock(name);
+  try { await rename(name, newName); return c.json({ ok: true, name: newName }); }
+  catch (e) { return c.json({ error: `Rename failed: ${(e as Error).message}` }, 500); }
+  finally { unlock(name); }
 });

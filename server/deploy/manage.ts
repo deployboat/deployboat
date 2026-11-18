@@ -3,6 +3,7 @@ import { db } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName, start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
+import { renameServices } from "../services/index.ts";
 
 // "running", "exited", "restarting"… or "missing" if there's no container.
 export const containerState = (app: string) =>
@@ -35,5 +36,23 @@ export async function remove(app: string) {
   db.prepare("DELETE FROM apps WHERE name = ?").run(app);
   db.prepare("DELETE FROM deploys WHERE app = ?").run(app);
   db.prepare("DELETE FROM env WHERE app = ?").run(app);
+  await syncRoutes();
+}
+
+// Rename an app: container, address, database, storage. The old name keeps
+// working for CLI deploys (see aliases in lib/db.ts).
+export async function rename(oldName: string, newName: string) {
+  const image = await currentImage(oldName);
+  await run("docker", ["rm", "-f", containerName(oldName)]).catch(() => {});
+
+  db.prepare("UPDATE apps SET name = ? WHERE name = ?").run(newName, oldName);
+  db.prepare("UPDATE deploys SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE env SET app = ? WHERE app = ?").run(newName, oldName);
+  db.prepare("UPDATE aliases SET name = ? WHERE name = ?").run(newName, oldName);
+  db.prepare("DELETE FROM aliases WHERE old = ?").run(newName);
+  db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);
+
+  await renameServices(oldName, newName);
+  if (image) await start(newName, image, () => {});
   await syncRoutes();
 }

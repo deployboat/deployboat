@@ -21,3 +21,8 @@ db.exec(`
 
 // Added later: which Docker image each deploy produced (for rollback).
 try { db.exec("ALTER TABLE deploys ADD COLUMN image TEXT"); } catch { /* already there */ }
+
+// Old app names → current name, so `deployboat deploy` keeps working after a rename.
+db.exec("CREATE TABLE IF NOT EXISTS aliases (old TEXT PRIMARY KEY, name TEXT NOT NULL)");
+export const resolveName = (name: string) =>
+  (db.prepare("SELECT name FROM aliases WHERE old = ?").get(name) as { name: string } | undefined)?.name ?? name;

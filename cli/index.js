@@ -56,6 +56,10 @@ async function deploy() {
 
   if (!res.ok) die((await res.json().catch(() => ({}))).error ?? `Server error ${res.status}`);
 
+  // The app may have been renamed in the dashboard. Remember the new name.
+  const current = res.headers.get("x-app-name");
+  if (current && current !== name) writeFileSync(projectFile, JSON.stringify({ name: current }, null, 2));
+
   // Stream the build log. Last line is "LIVE <url>" or "FAILED <reason>".
   let ok = false, buf = "";
   const decoder = new TextDecoder();

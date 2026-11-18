@@ -72,3 +72,15 @@ export async function tables(app: string) {
     return { table, rows: Number(rows) };
   });
 }
+
+// Rename the app's database and user. Gives it a fresh password.
+export async function rename(oldApp: string, newApp: string) {
+  if (!getEnv(newApp).DATABASE_URL) return; // nothing created yet
+  const from = "app_" + oldApp.replace(/-/g, "_"), to = "app_" + newApp.replace(/-/g, "_");
+  await sql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${from}'`);
+  await sql(`ALTER DATABASE ${from} RENAME TO ${to}`);
+  await sql(`ALTER ROLE ${from} RENAME TO ${to}`);
+  const password = secret();
+  await sql(`ALTER ROLE ${to} PASSWORD '${password}'`);
+  setEnv(newApp, "DATABASE_URL", `postgres://${to}:${password}@${CONTAINER}:5432/${to}`);
+}

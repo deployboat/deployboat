@@ -3,6 +3,7 @@ import { loginScreen } from "./screens/login.js";
 import { appsScreen } from "./screens/apps.js";
 import { appScreen, SECTIONS } from "./screens/app.js";
 import { settingsScreen } from "./screens/settings.js";
+import { serverScreen } from "./screens/server.js";
 
 const view = document.getElementById("view");
 
@@ -29,6 +30,12 @@ export function toast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg; t.hidden = false;
   clearTimeout(t.timer); t.timer = setTimeout(() => (t.hidden = true), 2200);
+}
+
+export function bytes(n) {
+  const u = ["B", "KB", "MB", "GB", "TB"]; let i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return `${n.toFixed(i ? 1 : 0)} ${u[i]}`;
 }
 
 export function timeAgo(sqlDate) {
@@ -68,6 +75,8 @@ const paths = {
   globe: "M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18",
   share: "M18 8a3 3 0 100-6 3 3 0 000 6zM6 15a3 3 0 100-6 3 3 0 000 6zM18 22a3 3 0 100-6 3 3 0 000 6zM8.6 13.5l6.8 4M15.4 6.5l-6.8 4",
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
+  server: "M3 4h18v7H3zM3 13h18v7H3zM7 7.5h.01M7 16.5h.01",
+  chevron: "M9 6l6 6-6 6",
   gear: "M12 15a3 3 0 100-6 3 3 0 000 6zM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1",
 };
 export const icon = (n) => `<svg class="i" viewBox="0 0 24 24"><path d="${paths[n]}"/></svg>`;
@@ -103,7 +112,8 @@ function drawNav(page, appName, section) {
         : link(`${base}/${id}`, ic, label, id === section)).join("")}`;
   } else {
     nav.innerHTML = `
-      ${link("#/", "box", "Apps", page !== "settings")}
+      ${link("#/", "box", "Apps", !["settings", "server"].includes(page))}
+      ${link("#/server", "server", "Server", page === "server")}
       ${link("#/settings", "gear", "Settings", page === "settings")}`;
   }
 }
@@ -125,6 +135,7 @@ async function render() {
   try {
     let stop;
     if (page === "settings") stop = await settingsScreen(box);
+    else if (page === "server") stop = await serverScreen(box);
     else if (page === "apps" && name) stop = await appScreen(box, decodeURIComponent(name), tab || "overview");
     else stop = await appsScreen(box);
     if (id === current) cleanup = stop ?? (() => {});

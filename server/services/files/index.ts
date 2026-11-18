@@ -121,3 +121,12 @@ export async function usage(app: string) {
     objects: Number(out.match(/Objects:\s*(\d+)/)?.[1] ?? 0),
   };
 }
+
+// Give the bucket the new name (Garage aliases), then drop the old one.
+export async function rename(oldApp: string, newApp: string) {
+  if (!getEnv(newApp).S3_BUCKET) return; // nothing created yet
+  await garage("bucket", "alias", bucketName(oldApp), bucketName(newApp));
+  await garage("bucket", "unalias", bucketName(oldApp)).catch(() => {});
+  setEnv(newApp, "S3_BUCKET", bucketName(newApp));
+  setEnv(newApp, "S3_PUBLIC_URL", `https://${filesHost(newApp)}`);
+}

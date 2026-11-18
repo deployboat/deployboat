@@ -59,6 +59,12 @@ function overview(box, base, app) {
         <dt>Container</dt><dd>${esc(app.state)}</dd>
       </dl>
     </div>
+    <form class="card pad" id="rename" style="margin-top:14px">
+      <b>App name</b>
+      <p class="muted" style="font-size:13px;margin:2px 0 10px">Changes the address too. Database, files and your project folder keep working.</p>
+      <div class="row"><input name="name" value="${esc(app.name)}" style="flex:1;min-width:180px" pattern="[a-z0-9][a-z0-9\-]*" required>
+        <button class="btn primary">Rename</button></div>
+    </form>
     <div class="row" style="margin-top:14px">
       <button class="btn" id="restart">${icon("restart")} Restart</button>
       <button class="btn danger" id="delete">${icon("trash")} Delete app</button>
@@ -70,6 +76,19 @@ function overview(box, base, app) {
     catch (err) { toast(err.message); }
     box.querySelector("#restart").disabled = false;
   };
+  const form = box.querySelector("#rename");
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const newName = form.name.value.trim().toLowerCase();
+    if (newName === app.name) return;
+    if (!confirm(`Rename ${app.name} to ${newName}? The site address changes too.`)) return;
+    form.querySelector("button").disabled = true;
+    try {
+      const r = await api(`${base}/rename`, { method: "POST", body: { newName } });
+      toast("Renamed");
+      location.hash = `#/apps/${encodeURIComponent(r.name)}/overview`;
+    } catch (err) { toast(err.message); form.querySelector("button").disabled = false; }
+  };
   box.querySelector("#delete").onclick = async () => {
     if (!confirm(`Delete ${app.name}? The site goes offline. Its database and files are kept.`)) return;
     try { await api(base, { method: "DELETE" }); toast("Deleted"); location.hash = "#/"; }
@@ -77,26 +96,32 @@ function overview(box, base, app) {
   };
 }
 
+// Each version is a collapsible row. Opening it loads its build log.
 function versions(box, base, app) {
   if (!app.deploys.length) { box.innerHTML = `<div class="card pad muted">No versions yet.</div>`; return; }
-  box.innerHTML = `
-    <div class="card list">${app.deploys.map((d) => `
-      <div>
+  box.innerHTML = `<div class="card">${app.deploys.map((d) => `
+    <details class="ver" data-id="${d.id}">
+      <summary>
+        <span class="chev">${icon("chevron")}</span>
         <span class="status ${esc(d.status)}">${esc(d.status)}</span>
         <span class="grow">Version #${d.id} ${d.current ? `<span class="badge">Running</span>` : ""}</span>
         <span class="muted">${timeAgo(d.created_at)}</span>
-        <button class="btn" data-log="${d.id}">Log</button>
-        ${d.canActivate && !d.current ? `<button class="btn" data-use="${d.id}">${icon("history")} Roll back</button>` : ""}
-      </div>`).join("")}
-    </div>
-    <pre class="log" id="deploylog" style="margin-top:14px" hidden></pre>`;
+      </summary>
+      <div class="verbody">
+        ${d.current ? "" : d.canActivate
+          ? `<div><button class="btn" data-use="${d.id}">${icon("history")} Roll back to this version</button></div>`
+          : `<div class="row"><button class="btn" disabled>${icon("history")} Roll back</button>
+             <span class="note">${d.status === "live" ? "Made before rollback existed, can't be restored." : "This version didn't build, so there's nothing to restore."}</span></div>`}
+        <pre class="log">Loading log…</pre>
+      </div>
+    </details>`).join("")}</div>`;
 
-  const pre = box.querySelector("#deploylog");
-  box.querySelectorAll("[data-log]").forEach((b) => (b.onclick = async () => {
-    const d = await api(`${base}/deploys/${b.dataset.log}`);
-    pre.hidden = false;
+  box.querySelectorAll("details.ver").forEach((el) => el.addEventListener("toggle", async () => {
+    const pre = el.querySelector("pre");
+    if (!el.open || pre.dataset.loaded) return;
+    const d = await api(`${base}/deploys/${el.dataset.id}`);
     pre.textContent = d.log || "(empty log)";
-    pre.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    pre.dataset.loaded = "1";
   }));
   box.querySelectorAll("[data-use]").forEach((b) => (b.onclick = async () => {
     if (!confirm(`Switch the live site to version #${b.dataset.use}?`)) return;
