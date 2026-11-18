@@ -11,6 +11,7 @@ import { run } from "../lib/shell.ts";
 import { containerName } from "../deploy/run.ts";
 import { pack, unpack, hasData } from "./archive.ts";
 import { remote, describe, type Remote } from "./remote/index.ts";
+import { notify } from "../alerts/index.ts";
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS backups (
@@ -61,12 +62,14 @@ async function backupApp(app: string, say: (l: string) => void) {
       } catch (e) {
         db.prepare("UPDATE backups SET remote_status = 'failed', note = note || ? WHERE id = ?").run(` · off-server copy failed: ${(e as Error).message}`, id);
         say(`  Off-server copy failed: ${(e as Error).message}`);
+        notify("backupFailed", `Off-server backup copy failed: ${app}`, (e as Error).message, "#/backups");
       }
     }
     say("  Done.");
   } catch (e) {
     db.prepare("UPDATE backups SET status = 'failed', note = ? WHERE id = ?").run((e as Error).message, id);
     say(`  Failed: ${(e as Error).message}`);
+    notify("backupFailed", `Backup failed: ${app}`, (e as Error).message, "#/backups");
   }
   await prune(app);
 }

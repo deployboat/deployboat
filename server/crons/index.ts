@@ -10,6 +10,7 @@ import { Cron } from "croner";
 import { spawn } from "node:child_process";
 import { db, isStopped } from "../lib/db.ts";
 import { containerName } from "../deploy/run.ts";
+import { notify } from "../alerts/index.ts";
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS crons (
@@ -120,6 +121,7 @@ export async function runJob(id: number) {
       }
     }
     finish("failed", RETRY_DELAYS.length + 1, clip(lastError));
+    notify("cronFailed", `Cron job failed: ${job.name} (${job.app})`, clip(lastError).slice(0, 1000), `#/apps/${job.app}/crons`);
   } finally {
     running.delete(id);
   }

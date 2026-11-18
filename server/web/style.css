@@ -220,3 +220,6 @@ details.guide summary { cursor: pointer; }
 .switch input:checked + span::after { transform: translateX(14px); }
 .banner { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; background: var(--soft); border-color: transparent; font-size: 14px; flex-wrap: wrap; }
 .banner a { color: var(--accent); }
+
+.events { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px 16px; margin-top: 14px; font-size: 13.5px; }
+.events .check { font-weight: 400; }

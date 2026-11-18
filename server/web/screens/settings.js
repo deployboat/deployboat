@@ -1,5 +1,6 @@
 // Settings: your token and how to connect the CLI.
 import { api, esc, icon, copy, toast, timeAgo } from "../app.js";
+import { alertsSection } from "./alerts.js";
 
 export async function settingsScreen(view) {
   const s = await api("/api/settings");
@@ -20,6 +21,7 @@ export async function settingsScreen(view) {
         <div id="newbox"></div>
         <div class="card list" id="toklist"></div>
       </div>
+      <div id="alerts"></div>
       <div>
         <b>App addresses</b>
         <p class="muted" style="margin-top:2px">New apps get <code>&lt;name&gt;.${esc(s.baseDomain)}</code></p>
@@ -45,6 +47,7 @@ export async function settingsScreen(view) {
   };
 
   drawTokens(view);
+  alertsSection(view.querySelector("#alerts"));
   view.querySelector("#newtok").onclick = () => {
     const box = view.querySelector("#newbox");
     box.innerHTML = `<form class="row" style="margin-bottom:10px"><input name="name" placeholder="Claude on my laptop" style="flex:1;min-width:180px" required autofocus>

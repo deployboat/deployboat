@@ -1,6 +1,8 @@
 // Server Doctor: runs every check every 10 minutes, keeps the latest results,
 // and runs fixes in the background (one at a time), logging what they did.
 import { db } from "../lib/db.ts";
+import { getSetting, setSetting } from "../lib/settings.ts";
+import { notify } from "../alerts/index.ts";
 import type { Check, Result } from "./types.ts";
 import { disk } from "./checks/disk.ts";
 import { memory } from "./checks/memory.ts";
@@ -48,8 +50,28 @@ export async function runChecks() {
     }));
     results = Object.fromEntries(out);
     checkedAt = new Date().toISOString();
+    alertOnChanges();
   })().finally(() => (checking = null));
   return checking;
+}
+
+// Alert when a check turns red, and again when it's fixed. Not on every run.
+// The last statuses are saved, so a restart doesn't re-send old alerts.
+function alertOnChanges() {
+  const before = getSetting<Record<string, string>>("doctor_last", {});
+  const now: Record<string, string> = {};
+  for (const c of CHECKS) {
+    const r = results[c.id];
+    if (!r) continue;
+    now[c.id] = r.status;
+    if (c.id === "backups") continue; // backups alert on their own, right when they fail
+    const text = [r.message, r.detail].filter(Boolean).join("\n");
+    if (r.status === "bad" && before[c.id] !== "bad")
+      notify(c.id === "apps" ? "appDown" : "serverProblem", c.id === "apps" ? r.message : `${c.title}: problem`, text, r.link ?? "#/doctor");
+    else if (before[c.id] === "bad" && (r.status === "ok" || r.status === "info"))
+      notify("resolved", `Fixed: ${c.title}`, r.message, "#/doctor");
+  }
+  setSetting("doctor_last", now);
 }
 
 const timeout = (ms: number) => new Promise<never>((_, fail) => setTimeout(() => fail(new Error("Took too long.")), ms));

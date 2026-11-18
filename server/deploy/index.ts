@@ -5,6 +5,7 @@ import { build } from "./build.ts";
 import { provisionServices, addService, type ServiceName } from "../services/index.ts";
 import { start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
+import { notify } from "../alerts/index.ts";
 
 export const appUrl = (name: string) => `https://${name}.${config.baseDomain}`;
 
@@ -42,6 +43,7 @@ export async function deploy(
   } catch (e) {
     save(`✗ ${(e as Error).message}`);
     finish("failed");
+    notify("deployFailed", `Deploy failed: ${name}`, (e as Error).message, `#/apps/${name}/versions`);
     throw e;
   }
 }
