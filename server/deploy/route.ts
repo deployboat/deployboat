@@ -7,10 +7,16 @@ import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
 import { run } from "../lib/shell.ts";
 import { containerName } from "./run.ts";
+import { filesHost, webUpstream } from "../services/files/index.ts";
 
-const route = (host: string, dial: string) => ({
+// Send requests for `host` to `dial`. Optionally rewrite the Host header.
+const route = (host: string, dial: string, hostHeader?: string) => ({
   match: [{ host: [host] }],
-  handle: [{ handler: "reverse_proxy", upstreams: [{ dial }] }],
+  handle: [{
+    handler: "reverse_proxy",
+    upstreams: [{ dial }],
+    ...(hostHeader && { headers: { request: { set: { Host: [hostHeader] } } } }),
+  }],
 });
 
 export async function syncRoutes() {
@@ -18,6 +24,7 @@ export async function syncRoutes() {
   const routes = [
     route(config.dashboardHost, `host.docker.internal:${config.port}`),
     ...apps.map((a) => route(`${a.name}.${config.baseDomain}`, `${containerName(a.name)}:3000`)),
+    ...apps.map((a) => route(filesHost(a.name), webUpstream.dial, webUpstream.host(a.name))),
   ];
 
   const caddyConfig = {
