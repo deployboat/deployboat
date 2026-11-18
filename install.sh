@@ -49,6 +49,7 @@ docker network inspect deployboat >/dev/null 2>&1 || docker network create deplo
 ufw allow from 172.16.0.0/12 to any port 3000 proto tcp >/dev/null
 docker inspect buildkit >/dev/null 2>&1 || docker run -d --name buildkit --privileged --restart unless-stopped moby/buildkit >/dev/null 2>&1
 mkdir -p /var/lib/deployboat/caddy
+chmod 700 /var/lib/deployboat  # app secrets live here: root only
 [ -f /var/lib/deployboat/caddy/config.json ] || echo '{}' > /var/lib/deployboat/caddy/config.json
 # Always (re)create Caddy so it has the latest settings. Routes live in config.json.
 docker rm -f caddy >/dev/null 2>&1 || true

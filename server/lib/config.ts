@@ -1,10 +1,12 @@
 // All settings in one place. Everything has a safe default.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 
 const dataDir = process.env.DEPLOYBOAT_DATA ?? "/var/lib/deployboat";
 mkdirSync(dataDir, { recursive: true });
+// Only root may look inside: it holds app secrets, deploy keys and passwords.
+try { chmodSync(dataDir, 0o700); } catch { /* not root, e.g. local dev */ }
 
 // Secret token for the CLI. Created once, then reused.
 const tokenFile = join(dataDir, "token");

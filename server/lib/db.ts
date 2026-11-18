@@ -1,9 +1,11 @@
 // Tiny SQLite database (built into Node). One table per thing we store.
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
+import { chmodSync } from "node:fs";
 import { config } from "./config.ts";
 
 export const db = new DatabaseSync(join(config.dataDir, "deployboat.db"));
+try { chmodSync(join(config.dataDir, "deployboat.db"), 0o600); } catch { /* fine */ }
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS apps (

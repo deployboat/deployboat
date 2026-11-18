@@ -8,6 +8,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { timingSafeEqual } from "node:crypto";
 import { config } from "../lib/config.ts";
 import { checkToken } from "../lib/tokens.ts";
+import { waitSeconds, failed, succeeded } from "../lib/ratelimit.ts";
 
 const COOKIE = "deployboat";
 
@@ -29,7 +30,17 @@ const AGENT_CAN: [string, RegExp][] = [
   ["GET", /^\/api\/agent-guide$/],
 ];
 
+// The visitor's address. Caddy (the only way in) puts it in X-Forwarded-For.
+const ipOf = (c: Context) => c.req.header("x-forwarded-for")?.split(",")[0].trim() || "local";
+
+const slowDown = (c: Context, s: number) =>
+  c.json({ error: `Too many wrong tries. Wait ${s > 90 ? `${Math.ceil(s / 60)} minutes` : `${s} seconds`} and try again.` }, 429);
+
 export async function requireLogin(c: Context, next: Next) {
+  const ip = ipOf(c);
+  const wait = waitSeconds(ip);
+  if (wait) return slowDown(c, wait);
+
   const bearer = c.req.header("authorization")?.replace(/^Bearer /, "") ?? "";
   const cookie = getCookie(c, COOKIE) ?? "";
 
@@ -45,6 +56,10 @@ export async function requireLogin(c: Context, next: Next) {
     c.set("role", "agent");
     return next();
   }
+  // Only count actual wrong tokens, not "not logged in yet" (no token at all).
+  if (bearer || cookie) failed(ip);
+  // An old cookie (e.g. after a token reset): drop it, so open tabs don't keep counting as wrong tries.
+  if (cookie) deleteCookie(c, COOKIE, { path: "/" });
   return c.json({ error: "Please log in. Your token is wrong, or it was revoked." }, 401);
 }
 
@@ -55,8 +70,12 @@ export const setLoginCookie = (c: Context) =>
   setCookie(c, COOKIE, config.token, { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: 60 * 60 * 24 * 30 });
 
 export async function login(c: Context) {
+  const ip = ipOf(c);
+  const wait = waitSeconds(ip);
+  if (wait) return slowDown(c, wait);
   const { token } = await c.req.json().catch(() => ({ token: "" }));
-  if (!same(String(token ?? "").trim(), config.token)) return c.json({ error: "That token is not correct." }, 401);
+  if (!same(String(token ?? "").trim(), config.token)) { failed(ip); return c.json({ error: "That token is not correct." }, 401); }
+  succeeded(ip);
   setLoginCookie(c);
   return c.json({ ok: true });
 }
