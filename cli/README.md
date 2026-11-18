@@ -14,7 +14,7 @@ You get a live HTTPS link. Need a database or file storage? Add `--with database
 
 ```
 deployboat deploy [folder]        publish a folder
-deployboat add database|storage   give the app a database or file storage
+deployboat add database|storage|email   give the app a database, file storage or email
 deployboat apps                   list your apps
 deployboat status                 this app's status and address
 deployboat logs [--lines 100]     this app's recent output

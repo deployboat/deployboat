@@ -84,6 +84,7 @@ const paths = {
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 7v5l3 2",
   server: "M3 4h18v7H3zM3 13h18v7H3zM7 7.5h.01M7 16.5h.01",
   chevron: "M9 6l6 6-6 6",
+  mail: "M3 5h18v14H3zM3 7l9 6 9-6",
   save: "M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2zM17 21v-8H7v8M7 3v5h8",
   download: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3",
   cloud: "M18 10h-1.3A8 8 0 109 20h9a5 5 0 000-10z",

@@ -8,6 +8,7 @@ export const SECTIONS = [
   ["overview", "Overview", "home"],
   ["domains", "Domains", "globe"],
   ["storage", "Storage", "folder"],
+  ["email", "Email", "mail"],
   ["database", "Database", "db"],
   ["share", "Share", "share"],
   ["crons", "Crons", "clock"],
@@ -40,7 +41,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs, variables, database, storage, domains, share, crons, settings }[section] ?? overview;
+  const show = { overview, versions, logs, variables, database, storage, email, domains, share, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -88,7 +89,7 @@ function overview(box, base, app) {
       <dl class="info">
         <dt>Address</dt><dd><a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></dd>
         ${app.filesUrl ? `<dt>Files</dt><dd><a href="${esc(app.filesUrl)}" target="_blank">${esc(app.filesUrl)}</a></dd>` : ""}
-        <dt>Services</dt><dd>${app.services.length ? app.services.map((x) => (x === "database" ? "Database" : "Storage")).join(", ") : `<span class="muted">None. Add a database or storage from the menu.</span>`}</dd>
+        <dt>Services</dt><dd>${app.services.length ? app.services.map((x) => ({ database: "Database", storage: "Storage", email: "Email" })[x]).join(", ") : `<span class="muted">None. Add a database or storage from the menu.</span>`}</dd>
         <dt>Last deploy</dt><dd>${timeAgo(app.deploys[0]?.created_at)}</dd>
         <dt>Container</dt><dd>${esc(app.state)}</dd>
         ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
@@ -369,6 +370,7 @@ async function variables(box, base) {
 
 // Danger zone at the bottom of the Database / Storage page.
 function removeServiceBox(box, base, app, service) {
+  if (service === "email") return removeEmailBox(box, base);
   const db = service === "database";
   const el = document.createElement("div");
   el.className = "card pad danger-zone";
@@ -390,25 +392,64 @@ function removeServiceBox(box, base, app, service) {
   };
 }
 
+function removeEmailBox(box, base) {
+  const el = document.createElement("div");
+  el.className = "card pad"; el.style.marginTop = "14px";
+  el.innerHTML = `<b>Remove email</b><p class="muted" style="font-size:13px;margin:2px 0 10px">The app restarts without the <code>SMTP_*</code> variables. Nothing is deleted.</p>
+    <button class="btn danger">${icon("trash")} Remove email</button>`;
+  box.append(el);
+  el.querySelector("button").onclick = async () => {
+    if (!confirm("Remove email from this app?")) return;
+    try { await api(`${base}/services/email`, { method: "DELETE" }); toast("Removed"); dispatchEvent(new HashChangeEvent("hashchange")); }
+    catch (err) { toast(err.message); }
+  };
+}
+
 // Shown when an app hasn't added a service yet.
+const SERVICE_TEXT = {
+  database: { icon: "db", title: "No database yet", button: "Create database", text: "Add a PostgreSQL database. Your app gets <code>DATABASE_URL</code> and restarts." },
+  storage: { icon: "folder", title: "No file storage yet", button: "Create storage", text: "Add S3-compatible storage for uploads and images. Your app gets <code>S3_*</code> variables and restarts." },
+  email: { icon: "mail", title: "No email yet", button: "Add email", text: "Let this app send email through your provider. It gets <code>SMTP_URL</code> and <code>SMTP_*</code> variables and restarts." },
+};
+
 function addServicePage(box, base, service) {
-  const db = service === "database";
+  const t = SERVICE_TEXT[service];
   box.innerHTML = `
     <div class="card empty">
-      ${icon(db ? "db" : "folder")}
-      <h2>${db ? "No database yet" : "No file storage yet"}</h2>
-      <p class="muted" style="max-width:440px;margin:6px auto 18px">${db
-        ? "Add a PostgreSQL database. Your app gets <code>DATABASE_URL</code> and restarts."
-        : "Add S3-compatible storage for uploads and images. Your app gets <code>S3_*</code> variables and restarts."}</p>
-      <button class="btn primary" id="addsvc">${icon("plus")} ${db ? "Create database" : "Create storage"}</button>
+      ${icon(t.icon)}
+      <h2>${t.title}</h2>
+      <p class="muted" style="max-width:440px;margin:6px auto 18px">${t.text}</p>
+      <button class="btn primary" id="addsvc">${icon("plus")} ${t.button}</button>
       <p class="note" style="margin-top:14px">AI agents can add it too: <code>deployboat add ${service}</code></p>
     </div>`;
   box.querySelector("#addsvc").onclick = async (e) => {
     const b = e.currentTarget;
-    b.disabled = true; b.innerHTML = `<span class="spinner" style="width:14px;height:14px"></span> Creating…`;
-    try { await api(`${base}/services/${service}`, { method: "POST" }); toast(db ? "Database created" : "Storage created"); dispatchEvent(new HashChangeEvent("hashchange")); }
-    catch (err) { toast(err.message); b.disabled = false; b.textContent = db ? "Create database" : "Create storage"; }
+    b.disabled = true; b.innerHTML = `<span class="spinner" style="width:14px;height:14px"></span> Adding…`;
+    try { await api(`${base}/services/${service}`, { method: "POST" }); toast("Added"); dispatchEvent(new HashChangeEvent("hashchange")); }
+    catch (err) {
+      toast(err.message); b.disabled = false; b.textContent = t.button;
+      if (/Settings/.test(err.message)) box.querySelector(".note").innerHTML = `First connect an email provider in <a href="#/settings">Settings → Email for apps</a>.`;
+    }
   };
+}
+
+// Email: shows the variables the app got.
+async function email(box, base, app) {
+  if (!app.services.includes("email")) return addServicePage(box, base, "email");
+  const vars = Object.fromEntries((await api(`${base}/env`)).map((v) => [v.key, v.value]));
+  box.innerHTML = `
+    <div class="card pad">
+      <dl class="info">
+        ${field("SMTP_URL", vars.SMTP_URL, { secret: true })}
+        ${field("SMTP_HOST", vars.SMTP_HOST)}
+        ${field("SMTP_PORT", vars.SMTP_PORT)}
+        ${field("SMTP_FROM", vars.SMTP_FROM)}
+      </dl>
+      <p class="muted" style="font-size:13px;margin-top:12px">Your app already has these, plus <code>SMTP_USER</code>, <code>SMTP_PASS</code> and <code>SMTP_SECURE</code>.
+        Send from <code>SMTP_FROM</code>. The provider is shared by all apps: change it in <a href="#/settings">Settings</a>.</p>
+    </div>`;
+  wireFields(box);
+  removeServiceBox(box, base, app, "email");
 }
 
 async function database(box, base, app) {

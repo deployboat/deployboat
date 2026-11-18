@@ -21,6 +21,7 @@ export async function settingsScreen(view) {
         <div id="newbox"></div>
         <div class="card list" id="toklist"></div>
       </div>
+      <div id="mail"></div>
       <div id="alerts"></div>
       <div>
         <b>App addresses</b>
@@ -48,6 +49,7 @@ export async function settingsScreen(view) {
 
   drawTokens(view);
   alertsSection(view.querySelector("#alerts"));
+  mailSection(view.querySelector("#mail"));
   view.querySelector("#newtok").onclick = () => {
     const box = view.querySelector("#newbox");
     box.innerHTML = `<form class="row" style="margin-bottom:10px"><input name="name" placeholder="Claude on my laptop" style="flex:1;min-width:180px" required autofocus>
@@ -78,4 +80,35 @@ async function drawTokens(view) {
     await api(`/api/tokens/${b.dataset.revoke}`, { method: "DELETE" });
     toast("Revoked"); drawTokens(view);
   }));
+}
+
+// Email for apps: one SMTP provider that apps can opt into.
+async function mailSection(el) {
+  const m = await api("/api/settings/mail");
+  el.innerHTML = `
+    <b>Email for apps</b>
+    <p class="muted" style="margin:2px 0 10px">Connect an email provider once (Resend, Postmark, Mailgun, Brevo, Gmail…).
+      Apps that add email send through it. ${m ? `Connected: <b>${esc(m.host)}</b> as ${esc(m.from || m.user)}.` : "Not connected."}</p>
+    <form class="form card pad" style="background:var(--bg)">
+      <div class="row"><label style="flex:2">SMTP server<input name="host" value="${esc(m?.host ?? "")}" placeholder="smtp.resend.com" required></label>
+        <label style="flex:1">Port<input name="port" type="number" value="${m?.port ?? 587}"></label></div>
+      <div class="row"><label style="flex:1">Username<input name="user" value="${esc(m?.user ?? "")}" autocomplete="off"></label>
+        <label style="flex:1">Password<input name="pass" type="password" placeholder="${m ? "unchanged" : ""}" autocomplete="new-password"></label></div>
+      <div class="row"><label style="flex:1">Send as<input name="from" value="${esc(m?.from ?? "")}" placeholder="My App &lt;hello@yourdomain.com&gt;"></label>
+        <label style="flex:1">Send a test to<input name="testTo" type="email" placeholder="you@example.com" required></label></div>
+      <p class="note">Port 587 works almost everywhere. Some hosts (like Hetzner) block 25 and 465.</p>
+      <div class="row" style="justify-content:flex-end">${m ? `<button type="button" class="btn danger" id="mailoff">Disconnect</button>` : ""}
+        <button class="btn primary">Send test &amp; save</button></div>
+    </form>`;
+  const f = el.querySelector("form");
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector(".primary"); btn.disabled = true; btn.textContent = "Sending test…";
+    try { await api("/api/settings/mail", { method: "PUT", body: Object.fromEntries(new FormData(f)) }); toast("Test sent and saved"); mailSection(el); }
+    catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Send test & save"; }
+  };
+  el.querySelector("#mailoff")?.addEventListener("click", async () => {
+    if (!confirm("Disconnect the email provider? Apps that use email will fail to send until you connect one again.")) return;
+    await api("/api/settings/mail", { method: "DELETE" }); toast("Disconnected"); mailSection(el);
+  });
 }

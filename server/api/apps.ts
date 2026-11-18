@@ -224,7 +224,7 @@ apps.delete("/:name/domains/:host", async (c) => {
 // Add a database or file storage to an app, then restart it so it sees the new variables.
 apps.post("/:name/services/:service", async (c) => {
   const { name, service } = c.req.param();
-  if (!isService(service)) return c.json({ error: "Use database or storage." }, 400);
+  if (!isService(service)) return c.json({ error: "Use database, storage or email." }, 400);
   if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
   lock(name);
   try {
@@ -251,11 +251,11 @@ apps.put("/:name/git", async (c) => {
 // Remove a database or storage and DELETE its data. A last backup is made first.
 apps.delete("/:name/services/:service", async (c) => {
   const { name, service } = c.req.param();
-  if (!isService(service)) return c.json({ error: "Use database or storage." }, 400);
+  if (!isService(service)) return c.json({ error: "Use database, storage or email." }, 400);
   if (!enabledServices(name).includes(service)) return c.json({ ok: true, services: enabledServices(name) });
   if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
   const isPreview = !!previewInfo(name).previewOf;
-  if (!isPreview) {
+  if (!isPreview && service !== "email") { // email has no data to back up
     try { await backupNow(name); }
     catch (e) { return c.json({ error: `Couldn't make a last backup, so nothing was deleted: ${(e as Error).message}` }, 409); }
     const last = db.prepare("SELECT status, note FROM backups WHERE app = ? ORDER BY id DESC LIMIT 1").get(name) as { status: string; note: string } | undefined;

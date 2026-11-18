@@ -1,4 +1,4 @@
-// Built-in services an app can add: a database and file storage.
+// Built-in services an app can add: a database, file storage and email.
 // Nothing is added automatically. The user (dashboard) or their AI agent asks for it.
 // Once added, every deploy makes sure it still exists.
 //
@@ -6,8 +6,9 @@
 // rename() and destroy(), then list it here.
 import * as postgres from "./postgres/index.ts";
 import * as files from "./files/index.ts";
+import * as email from "./email/index.ts";
 
-export const SERVICES = { database: postgres, storage: files };
+export const SERVICES = { database: postgres, storage: files, email };
 export type ServiceName = keyof typeof SERVICES;
 export const isService = (s: string): s is ServiceName => s in SERVICES;
 

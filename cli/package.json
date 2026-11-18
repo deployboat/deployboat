@@ -1,6 +1,6 @@
 {
   "name": "deployboat",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Publish any project to your own Deploy Boat server with one command.",
   "type": "module",
   "bin": {

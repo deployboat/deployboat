@@ -24,4 +24,4 @@ export function deleteEnv(app: string, key: string) {
 }
 
 // Values created by built-in services. Shown in the dashboard, but not editable.
-export const isBuiltin = (key: string) => /^(DATABASE_URL|S3_|AWS_)/.test(key);
+export const isBuiltin = (key: string) => /^(DATABASE_URL|S3_|AWS_|SMTP_)/.test(key);

@@ -13,15 +13,15 @@ const TOOLS = [
     inputSchema: { type: "object", properties: {
       path: { type: "string", description: "Absolute path of the project folder. Defaults to the current folder." },
       name: { type: "string", description: "App name (letters, numbers, dashes). Defaults to the name saved in .deployboat.json or the folder name." },
-      services: { type: "array", items: { type: "string", enum: ["database", "storage"] },
-        description: "Add these on this deploy, only if the app needs them: database (PostgreSQL, DATABASE_URL) and/or storage (S3 file storage)." },
+      services: { type: "array", items: { type: "string", enum: ["database", "storage", "email"] },
+        description: "Add these on this deploy, only if the app needs them: database (PostgreSQL, DATABASE_URL), storage (S3 file storage), email (SMTP_* to send email)." },
     } },
   },
   {
     name: "add_service",
-    description: "Give an existing app a PostgreSQL database (DATABASE_URL) or S3 file storage (S3_* variables). The app restarts. Only add what the app needs.",
+    description: "Give an existing app a PostgreSQL database (DATABASE_URL), S3 file storage (S3_* variables) or email sending (SMTP_* variables). The app restarts. Only add what the app needs.",
     inputSchema: { type: "object", required: ["service"], properties: {
-      service: { type: "string", enum: ["database", "storage"] }, name: { type: "string" }, path: { type: "string" },
+      service: { type: "string", enum: ["database", "storage", "email"] }, name: { type: "string" }, path: { type: "string" },
     } },
   },
   { name: "list_apps", description: "List the apps on the Deploy Boat server with their URLs and status.", inputSchema: { type: "object", properties: {} } },
@@ -66,9 +66,11 @@ async function callTool(name, a = {}) {
     }
     case "add_service": {
       await api(conn, `/api/apps/${await appOf(conn, a)}/services/${a.service}`, { method: "POST" });
-      return text(a.service === "database"
-        ? "Database added. The app now has DATABASE_URL and has restarted."
-        : "File storage added. The app now has S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION and S3_PUBLIC_URL, and has restarted.");
+      return text({
+        database: "Database added. The app now has DATABASE_URL and has restarted.",
+        storage: "File storage added. The app now has S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION and S3_PUBLIC_URL, and has restarted.",
+        email: "Email added. The app now has SMTP_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM and SMTP_SECURE, and has restarted. Send from SMTP_FROM.",
+      }[a.service] ?? "Added.");
     }
     case "list_apps": {
       const list = await api(conn, "/api/apps");

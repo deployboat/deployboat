@@ -21,8 +21,8 @@ const HELP = `Deploy Boat — publish any project to your own server.
 
   deployboat login <server-url> <token>   connect this computer (once)
   deployboat deploy [folder]              publish a folder (default: this one)
-             [--with database,storage]    …and add a database and/or file storage
-  deployboat add database|storage         add a database or file storage to this app
+             [--with database,storage]    …and add services (database, storage, email)
+  deployboat add database|storage|email   add a database, file storage or email to this app
   deployboat apps                         list your apps
   deployboat status                       this app's status and address
   deployboat logs [--lines 100]           this app's recent output
@@ -62,9 +62,9 @@ try {
 
     case "add": {
       const service = args[0];
-      if (!["database", "storage"].includes(service)) fail("Usage: deployboat add database   (or: add storage)");
+      if (!["database", "storage", "email"].includes(service)) fail("Usage: deployboat add database   (or: add storage, add email)");
       const r = await api(conn(), `/api/apps/${await app()}/services/${service}`, { method: "POST" });
-      out(r, `✓ ${service === "database" ? "Database" : "File storage"} added. The app restarted with the new variables.`);
+      out(r, `✓ ${{ database: "Database", storage: "File storage", email: "Email" }[service]} added. The app restarted with the new variables.`);
       break;
     }
 
