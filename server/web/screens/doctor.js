@@ -2,6 +2,19 @@
 // their own card: what it will do → progress → result. Passed checks stay out of the way.
 import { api, esc, icon, toast, timeAgo } from "../app.js";
 
+const EVERY = { "10m": "every 10 min", "1h": "every hour", "1d": "once a day", manual: "manual only" };
+
+// "Checked 5 min ago · [every hour ▾] · Check" — under every check.
+function meta(i) {
+  return `
+    <span class="doc-meta">
+      ${i.running ? `<span><span class="spinner sm"></span> checking…</span>` : `<span>${i.checkedAt ? `Checked ${timeAgo(i.checkedAt.replace("T", " ").slice(0, 19))}` : "Not checked yet"}</span>`}
+      ${i.ms > 5000 ? `<span class="slow" title="This check is slow. Consider running it less often.">took ${(i.ms / 1000).toFixed(0)}s</span>` : ""}
+      <select data-every="${esc(i.id)}" title="How often this runs">${Object.entries(EVERY).map(([k, l]) => `<option value="${k}" ${k === i.every ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <button class="linkbtn" data-one="${esc(i.id)}" ${i.running ? "disabled" : ""}>Check</button>
+    </span>`;
+}
+
 export async function doctorScreen(view) {
   let timer, data = null, history = [];
   const open = { fix: null, passed: false, history: false }; // what the user has opened
@@ -25,6 +38,7 @@ export async function doctorScreen(view) {
     const attention = r.items.filter((i) => i.status === "bad" || i.status === "warn");
     const info = r.items.filter((i) => i.status === "info");
     const passed = r.items.filter((i) => i.status === "ok");
+    const notYet = r.items.filter((i) => i.status === "none");
     const when = r.checkedAt ? timeAgo(r.checkedAt.replace("T", " ").slice(0, 19)) : null;
 
     view.innerHTML = `
@@ -34,9 +48,9 @@ export async function doctorScreen(view) {
         <span class="doc-score" title="Health score: 100 when all is well">${r.score}</span>
         <div class="grow">
           <b>${!when ? "Running the first check…" : attention.length ? `${attention.length} thing${attention.length === 1 ? " needs" : "s need"} your attention` : "Everything looks good"}</b>
-          <span class="muted">${when ? `Checked ${when}. Runs by itself every 10 minutes.` : "This takes a few seconds."}</span>
+          <span class="muted">${when ? `Last check ${when}. Each check runs on its own schedule.` : "This takes a few seconds."}</span>
         </div>
-        <button class="btn" id="recheck" ${r.checking ? "disabled" : ""}>${r.checking ? `<span class="spinner sm"></span> Checking…` : "Check again"}</button>
+        <button class="btn" id="recheck" ${r.checking ? "disabled" : ""}>${r.checking ? `<span class="spinner sm"></span> Checking…` : "Check everything"}</button>
       </div>
 
       ${attention.length ? `
@@ -47,11 +61,17 @@ export async function doctorScreen(view) {
         <h3 class="doc-h">Good to know</h3>
         <div class="doc-list">${info.map(card).join("")}</div>` : ""}
 
+      ${notYet.length ? `
+        <h3 class="doc-h">Not checked yet</h3>
+        <div class="card doc-passed" style="margin-bottom:22px">${notYet.map((i) => `
+          <div><span class="tick muted">${icon("info")}</span><b>${esc(i.title)}</b><span class="doc-cat">${esc(i.category)}</span>${meta(i)}</div>`).join("")}</div>` : ""}
+
       ${passed.length ? `
         <button class="doc-toggle" data-open="passed"><span class="chev ${open.passed ? "open" : ""}">${icon("chevron")}</span>
           ${passed.length} check${passed.length === 1 ? "" : "s"} passed</button>
         ${open.passed ? `<div class="card doc-passed">${passed.map((i) => `
-          <div><span class="tick">${icon("check")}</span><b>${esc(i.title)}</b><span class="muted">${esc(i.message)}</span></div>`).join("")}</div>` : ""}` : ""}
+          <div><span class="tick">${icon("check")}</span><b>${esc(i.title)}</b><span class="doc-cat">${esc(i.category ?? "")}</span>
+            <span class="muted grow">${esc(i.message)}</span>${meta(i)}</div>`).join("")}</div>` : ""}` : ""}
 
       ${history.length ? `
         <button class="doc-toggle" data-open="history"><span class="chev ${open.history ? "open" : ""}">${icon("chevron")}</span>
@@ -68,6 +88,15 @@ export async function doctorScreen(view) {
     };
     view.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => { open[b.dataset.open] = !open[b.dataset.open]; draw(); }));
     view.querySelectorAll("[data-fix]").forEach((b) => (b.onclick = () => askFix(b.dataset.fix)));
+    view.querySelectorAll("[data-one]").forEach((b) => (b.onclick = async () => {
+      b.disabled = true; b.textContent = "Checking…";
+      try { data = await api(`/api/doctor/check?id=${encodeURIComponent(b.dataset.one)}`, { method: "POST" }); } catch (err) { toast(err.message); }
+      draw();
+    }));
+    view.querySelectorAll("[data-every]").forEach((sel) => (sel.onchange = async () => {
+      try { data = await api(`/api/doctor/every/${encodeURIComponent(sel.dataset.every)}`, { method: "PUT", body: { every: sel.value } }); toast(`Now ${EVERY[sel.value]}`); }
+      catch (err) { toast(err.message); }
+    }));
     view.querySelectorAll("[data-cancel]").forEach((b) => (b.onclick = () => { open.fix = null; draw(); }));
     view.querySelectorAll("[data-run]").forEach((b) => (b.onclick = () => runFix()));
   }
@@ -81,9 +110,10 @@ export async function doctorScreen(view) {
         <div class="doc-main">
           <span class="doc-ico">${icon(i.status === "info" ? "info" : "alert")}</span>
           <div class="grow">
-            <b>${esc(i.title)}</b>
+            <b>${esc(i.title)} <span class="doc-cat">${esc(i.category ?? "")}</span></b>
             <p>${esc(i.message)}</p>
             ${i.detail ? `<p class="muted">${esc(i.detail)}</p>` : ""}
+            ${meta(i)}
           </div>
           <div class="doc-actions">
             ${i.link ? `<a class="btn" href="${esc(i.link)}">${i.link.includes("/logs") ? "See logs" : "Open"}</a>` : ""}

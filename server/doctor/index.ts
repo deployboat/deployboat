@@ -17,9 +17,29 @@ import { apps } from "./checks/apps.ts";
 import { time } from "./checks/time.ts";
 import { version } from "./checks/version.ts";
 import { backups } from "./checks/backups.ts";
+import { rootLogin } from "./checks/rootlogin.ts";
+import { firewallPolicy } from "./checks/firewallpolicy.ts";
+import { exposedPorts } from "./checks/exposedports.ts";
+import { kernel } from "./checks/kernel.ts";
+import { autoUpdates } from "./checks/autoupdates.ts";
+import { emptyPasswords } from "./checks/emptypasswords.ts";
+import { inodes } from "./checks/inodes.ts";
+import { dockerSpace } from "./checks/dockerspace.ts";
+import { journal } from "./checks/journal.ts";
+import { oom } from "./checks/oom.ts";
+import { load } from "./checks/load.ts";
+import { failedUnits } from "./checks/failedunits.ts";
 
 // To add a check: write a file in checks/ and add it here.
-export const CHECKS: Check[] = [services, apps, disk, memory, https, firewall, ssh, fail2ban, updates, reboot, time, version, backups];
+export const CHECKS: Check[] = [
+  // health
+  services, apps, disk, inodes, memory, oom, load, dockerSpace, journal, failedUnits, https, backups, time, version,
+  // security
+  firewall, firewallPolicy, exposedPorts, ssh, rootLogin, emptyPasswords, fail2ban, updates, autoUpdates, kernel, reboot,
+];
+
+// Shown as a small label on each check in the dashboard.
+const SECURITY = new Set(["firewall", "firewallpolicy", "exposedports", "ssh", "rootlogin", "emptypasswords", "fail2ban", "updates", "autoupdates", "kernel", "reboot"]);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS doctor_log (
@@ -32,35 +52,69 @@ db.exec(`
   );
 `);
 
-const EVERY = 10 * 60 * 1000;
-let results: Record<string, Result> = {};
-let checkedAt: string | null = null;
-let checking: Promise<void> | null = null;
+// --- how often each check runs -------------------------------------------------------
+// Cheap and urgent: every 10 minutes. Slow-changing or heavier: hourly or daily.
+// The user can change any of them (or set "manual") on the Doctor page.
+export const FREQUENCIES = { "10m": 10 * 60_000, "1h": 60 * 60_000, "1d": 24 * 60 * 60_000, manual: Infinity } as const;
+export type Every = keyof typeof FREQUENCIES;
+
+const DEFAULT_EVERY: Record<string, Every> = {
+  services: "10m", apps: "10m", disk: "10m", memory: "10m", load: "10m",
+  https: "1h", firewall: "1h", firewallpolicy: "1h", exposedports: "1h", ssh: "1h", rootlogin: "1h", fail2ban: "1h",
+  backups: "1h", oom: "1h", inodes: "1h", failedunits: "1h", reboot: "1h",
+  updates: "1d", autoupdates: "1d", kernel: "1d", emptypasswords: "1d", dockerspace: "1d", journal: "1d", time: "1d", version: "1d",
+};
+const everyOf = (id: string): Every => getSetting<Record<string, Every>>("doctor_every", {})[id] ?? DEFAULT_EVERY[id] ?? "1h";
+
+export function setEvery(id: string, every: Every) {
+  if (!CHECKS.some((c) => c.id === id) || !(every in FREQUENCIES)) throw new Error("Unknown check or frequency.");
+  setSetting("doctor_every", { ...getSetting<Record<string, Every>>("doctor_every", {}), [id]: every });
+}
+
+// --- results ---------------------------------------------------------------------------
+// Saved after every run, so a restart doesn't need to re-run everything.
+type Stored = Result & { checkedAt: string; ms: number };
+let results: Record<string, Stored> = {};
+const running = new Set<string>();
 let fixing: string | null = null;
 
-export async function runChecks() {
-  // If a check run is already going, wait for that one instead of starting another.
-  checking ??= (async () => {
-    const out = await Promise.all(CHECKS.map(async (c) => {
-      try {
-        return [c.id, await Promise.race([c.check(), timeout(30_000)])] as const;
-      } catch (e) {
-        return [c.id, { status: "info", message: "This check couldn't run.", detail: (e as Error).message } as Result] as const;
-      }
-    }));
-    results = Object.fromEntries(out);
-    checkedAt = new Date().toISOString();
-    alertOnChanges();
-  })().finally(() => (checking = null));
-  return checking;
+const MAX_AT_ONCE = 3;
+const timeout = (ms: number) => new Promise<never>((_, fail) => setTimeout(() => fail(new Error("Took too long.")), ms));
+
+async function runOne(c: Check) {
+  running.add(c.id);
+  const started = Date.now();
+  let r: Result;
+  try { r = await Promise.race([c.check(), timeout(30_000)]); }
+  catch (e) { r = { status: "info", message: "This check couldn't run.", detail: (e as Error).message }; }
+  results[c.id] = { ...r, checkedAt: new Date().toISOString(), ms: Date.now() - started };
+  running.delete(c.id);
 }
+
+// Run the given checks, at most 3 at a time (no CPU spike).
+export async function runChecks(ids?: string[]) {
+  const todo = CHECKS.filter((c) => (!ids || ids.includes(c.id)) && !running.has(c.id));
+  const queue = [...todo];
+  await Promise.all(Array.from({ length: Math.min(MAX_AT_ONCE, queue.length) }, async () => {
+    for (let c = queue.shift(); c; c = queue.shift()) await runOne(c);
+  }));
+  setSetting("doctor_results", results);
+  alertOnChanges(todo.map((c) => c.id));
+}
+
+// Which checks are due now, by their own schedule.
+const due = () => CHECKS.filter((c) => {
+  const every = FREQUENCIES[everyOf(c.id)];
+  const last = results[c.id] ? Date.parse(results[c.id].checkedAt) : 0;
+  return Number.isFinite(every) && Date.now() - last >= every;
+}).map((c) => c.id);
 
 // Alert when a check turns red, and again when it's fixed. Not on every run.
 // The last statuses are saved, so a restart doesn't re-send old alerts.
-function alertOnChanges() {
+function alertOnChanges(ids: string[]) {
   const before = getSetting<Record<string, string>>("doctor_last", {});
-  const now: Record<string, string> = {};
-  for (const c of CHECKS) {
+  const now = { ...before };
+  for (const c of CHECKS.filter((x) => ids.includes(x.id))) {
     const r = results[c.id];
     if (!r) continue;
     now[c.id] = r.status;
@@ -74,8 +128,6 @@ function alertOnChanges() {
   setSetting("doctor_last", now);
 }
 
-const timeout = (ms: number) => new Promise<never>((_, fail) => setTimeout(() => fail(new Error("Took too long.")), ms));
-
 // 100 when all is well. Problems cost 25, warnings 10.
 function score() {
   const all = Object.values(results);
@@ -83,13 +135,20 @@ function score() {
 }
 
 export function report() {
-  const order = { bad: 0, warn: 1, info: 2, ok: 3 };
-  const items = CHECKS.filter((c) => results[c.id]).map((c) => {
+  const order = { bad: 0, warn: 1, info: 2, ok: 3, none: 4 };
+  const items = CHECKS.map((c) => {
     const r = results[c.id];
+    const base = { id: c.id, title: c.title, category: SECURITY.has(c.id) ? "Security" : "Health", every: everyOf(c.id), running: running.has(c.id) };
+    if (!r) return { ...base, status: "none" as const, message: "Not checked yet.", fix: null, checkedAt: null, ms: null };
     const showFix = c.fix && r.canFix !== false && r.status !== "ok";
-    return { id: c.id, title: c.title, ...r, fix: showFix ? c.fix!.label : null };
+    return { ...base, ...r, fix: showFix ? c.fix!.label : null };
   }).sort((a, b) => order[a.status] - order[b.status]);
-  return { score: score(), checkedAt, checking: !!checking, fixing, items, issues: items.filter((i) => i.status === "bad" || i.status === "warn").length };
+  const times = Object.values(results).map((r) => r.checkedAt).sort();
+  return {
+    score: score(), checkedAt: times.at(-1) ?? null, checking: running.size > 0, fixing, items,
+    issues: items.filter((i) => i.status === "bad" || i.status === "warn").length,
+    frequencies: Object.keys(FREQUENCIES),
+  };
 }
 
 export async function describeFix(id: string) {
@@ -112,13 +171,18 @@ export function startFix(id: string) {
 
   c.fix.run(log)
     .then(() => end("done"), (e) => { log(`✗ ${(e as Error).message}`); end("failed"); })
-    .finally(() => { fixing = null; runChecks(); });
+    // Re-check what the fix touched (and the cheap checks it might affect).
+    .finally(() => { fixing = null; runChecks([id, "disk", "inodes", "memory"]); });
 }
 
 export const history = () => db.prepare("SELECT * FROM doctor_log ORDER BY id DESC LIMIT 30").all();
 
 export function startDoctor() {
   db.prepare("UPDATE doctor_log SET status = 'failed', output = output || '\nDeploy Boat restarted during this fix.' WHERE status = 'running'").run();
-  setTimeout(() => runChecks(), 15_000); // let Caddy & co. settle after a restart
-  setInterval(() => runChecks(), EVERY);
+  results = getSetting<Record<string, Stored>>("doctor_results", {});
+  // Every minute, run whatever is due. The first look waits a bit after a restart, so Caddy & co. can settle.
+  setTimeout(() => {
+    runChecks(due());
+    setInterval(() => { const ids = due(); if (ids.length) runChecks(ids); }, 60_000);
+  }, 15_000);
 }
