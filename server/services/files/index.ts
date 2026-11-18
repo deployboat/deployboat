@@ -79,6 +79,10 @@ async function ensureRunning(log: (l: string) => void) {
 export async function provision(app: string, log: (l: string) => void) {
   await ensureRunning(log);
 
+  // Newer AWS SDKs send checksums Garage doesn't support. Only send them when required.
+  setEnv(app, "AWS_REQUEST_CHECKSUM_CALCULATION", "when_required");
+  setEnv(app, "AWS_RESPONSE_CHECKSUM_VALIDATION", "when_required");
+
   const bucket = bucketName(app);
   const bucketExists = await garage("bucket", "info", bucket).then(() => true, () => false);
   if (getEnv(app).S3_ACCESS_KEY && bucketExists) return;
