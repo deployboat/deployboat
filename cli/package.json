@@ -1,14 +1,35 @@
 {
   "name": "deployboat",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Publish any project to your own Deploy Boat server with one command.",
   "type": "module",
-  "bin": { "deployboat": "index.js" },
-  "files": ["index.js", "README.md"],
-  "engines": { "node": ">=20" },
-  "keywords": ["deploy", "self-hosted", "paas", "hosting", "cli", "ai"],
+  "bin": {
+    "deployboat": "index.js"
+  },
+  "files": [
+    "index.js",
+    "lib.js",
+    "mcp.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "deploy",
+    "self-hosted",
+    "paas",
+    "hosting",
+    "cli",
+    "ai",
+    "mcp"
+  ],
   "license": "MIT",
-  "repository": { "type": "git", "url": "git+https://github.com/osbulbul/deploy-boat.git", "directory": "cli" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/osbulbul/deploy-boat.git",
+    "directory": "cli"
+  },
   "homepage": "https://github.com/osbulbul/deploy-boat#readme",
   "bugs": "https://github.com/osbulbul/deploy-boat/issues"
 }

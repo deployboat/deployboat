@@ -7,12 +7,13 @@ import { isBusy, lock, unlock } from "../lib/lock.ts";
 import { deploy } from "../deploy/index.ts";
 import { extract } from "../deploy/extract.ts";
 import { requireLogin, login, logout } from "./auth.ts";
+import { tokens } from "./tokens.ts";
 import { apps } from "./apps.ts";
 import { server } from "./server.ts";
 import { git } from "./git.ts";
 import { doctor } from "./doctor.ts";
-import { agentPrompt } from "./agent.ts";
-import { resolveName } from "../lib/db.ts";
+import { agentPrompt, agentGuide } from "./agent.ts";
+import { resolveName, db } from "../lib/db.ts";
 
 export const app = new Hono();
 
@@ -26,7 +27,14 @@ app.route("/api/apps", apps);
 app.route("/api/server", server);
 app.route("/api/git", git);
 app.route("/api/doctor", doctor);
+app.route("/api/tokens", tokens);
 app.get("/api/agent-prompt", agentPrompt);
+app.get("/api/agent-guide", agentGuide);
+// Old app name → current name (after a rename). 404 if there's no such app.
+app.get("/api/resolve/:name", (c) => {
+  const name = resolveName(c.req.param("name").toLowerCase());
+  return db.prepare("SELECT 1 FROM apps WHERE name = ?").get(name) ? c.json({ name }) : c.json({ error: `No app called "${name}" yet. Deploy it first.` }, 404);
+});
 
 app.get("/api/settings", (c) =>
   c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain }),

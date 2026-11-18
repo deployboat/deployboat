@@ -1,22 +1,22 @@
 // Settings: your token and how to connect the CLI.
-import { api, esc, icon, copy } from "../app.js";
+import { api, esc, icon, copy, toast, timeAgo } from "../app.js";
 
 export async function settingsScreen(view) {
   const s = await api("/api/settings");
-  const login = `npx deployboat login ${s.dashboard} ${s.token}`;
   view.innerHTML = `
     <div class="head"><h1>Settings</h1></div>
     <div class="card pad" style="display:grid;gap:18px">
       <div>
-        <b>Connect your computer</b>
-        <p class="muted" style="margin:2px 0 10px">Run this once, then <code>npx deployboat deploy</code> in any project.</p>
-        <div class="row"><input readonly value="${esc(login)}" class="secret"><button class="btn" id="cl">${icon("copy")} Copy</button></div>
-      </div>
-      <div>
-        <b>Token</b>
-        <p class="muted" style="margin:2px 0 10px">Keep it secret. Anyone with it can deploy to this server.</p>
+        <b>Main token</b>
+        <p class="muted" style="margin:2px 0 10px">Full access, for logging in to this dashboard. Don't paste it into AI tools: use an agent token instead.</p>
         <div class="row"><input readonly type="password" value="${esc(s.token)}" id="tok" class="secret">
           <button class="btn" id="show">Show</button><button class="btn" id="ct">${icon("copy")}</button></div>
+      </div>
+      <div>
+        <div class="row spread"><b>Agent tokens</b><button class="btn" id="newtok">${icon("plus")} New token</button></div>
+        <p class="muted" style="margin:2px 0 10px">For the CLI and AI agents. They can deploy and read logs, but can't delete apps, change the server or read secrets.</p>
+        <div id="newbox"></div>
+        <div class="card list" id="toklist"></div>
       </div>
       <div>
         <b>App addresses</b>
@@ -24,11 +24,42 @@ export async function settingsScreen(view) {
       </div>
     </div>`;
 
-  view.querySelector("#cl").onclick = () => copy(login);
   view.querySelector("#ct").onclick = () => copy(s.token);
   view.querySelector("#show").onclick = (e) => {
     const t = view.querySelector("#tok");
     t.type = t.type === "password" ? "text" : "password";
     e.target.textContent = t.type === "password" ? "Show" : "Hide";
   };
+
+  drawTokens(view);
+  view.querySelector("#newtok").onclick = () => {
+    const box = view.querySelector("#newbox");
+    box.innerHTML = `<form class="row" style="margin-bottom:10px"><input name="name" placeholder="Claude on my laptop" style="flex:1;min-width:180px" required autofocus>
+      <button class="btn primary">Create</button></form>`;
+    box.querySelector("form").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await api("/api/tokens", { method: "POST", body: { name: e.target.name.value } });
+      box.innerHTML = `<div class="card pad" style="margin-bottom:10px;background:var(--soft)">
+        <b>${esc(r.name)}</b> <span class="note">Copy it now. It won't be shown again.</span>
+        <div class="row" style="margin-top:8px;flex-wrap:nowrap"><input readonly value="${esc(r.token)}" class="secret"><button class="btn" id="cp">${icon("copy")}</button></div></div>`;
+      box.querySelector("#cp").onclick = () => copy(r.token);
+      drawTokens(view);
+    };
+  };
+}
+
+async function drawTokens(view) {
+  const list = await api("/api/tokens");
+  const el = view.querySelector("#toklist");
+  el.innerHTML = list.map((t) => `
+    <div>
+      <span class="grow"><b>${esc(t.name)}</b> <span class="muted">…${esc(t.hint)}</span></span>
+      <span class="note">created ${timeAgo(t.created_at)} · ${t.last_used_at ? `used ${timeAgo(t.last_used_at)}` : "never used"}</span>
+      <button class="btn danger" data-revoke="${t.id}">Revoke</button>
+    </div>`).join("") || `<div class="muted">No agent tokens yet.</div>`;
+  el.querySelectorAll("[data-revoke]").forEach((b) => (b.onclick = async () => {
+    if (!confirm("Revoke this token? Anything using it stops working right away.")) return;
+    await api(`/api/tokens/${b.dataset.revoke}`, { method: "DELETE" });
+    toast("Revoked"); drawTokens(view);
+  }));
 }

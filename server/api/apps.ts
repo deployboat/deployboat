@@ -13,6 +13,7 @@ import { domainsOf, domainOwner, addDomain, removeDomain, validHost, dnsReady } 
 import { syncRoutes } from "../deploy/route.ts";
 import { config } from "../lib/config.ts";
 import { share } from "./share.ts";
+import { isAdmin } from "./auth.ts";
 import { crons } from "./crons.ts";
 
 export const apps = new Hono();
@@ -73,11 +74,13 @@ apps.get("/:name/deploys/:id", (c) => {
   return row ? c.json(row) : c.json({ error: "Deploy not found." }, 404);
 });
 
-apps.get("/:name/logs", async (c) => c.text(await appLogs(c.req.param("name"))));
+apps.get("/:name/logs", async (c) => c.text(await appLogs(c.req.param("name"), Math.min(Number(c.req.query("lines")) || 200, 2000))));
 
 apps.get("/:name/env", (c) => {
   const env = getEnv(c.req.param("name"));
-  return c.json(Object.entries(env).sort().map(([key, value]) => ({ key, value, builtin: isBuiltin(key) })));
+  // Agent tokens see names only. Secrets stay in the dashboard.
+  const showValues = isAdmin(c);
+  return c.json(Object.entries(env).sort().map(([key, value]) => ({ key, ...(showValues && { value }), builtin: isBuiltin(key) })));
 });
 
 // Save one variable, then restart so the app sees it.

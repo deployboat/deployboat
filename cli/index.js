@@ -1,76 +1,112 @@
 #!/usr/bin/env node
 // Deploy Boat CLI. Plain JavaScript, no dependencies, so `npx deployboat` is instant.
-//
-//   deployboat login <server-url> <token>
-//   deployboat deploy [--name my-app]
-//
-// Server and token can also come from DEPLOYBOAT_URL / DEPLOYBOAT_TOKEN or --server / --token.
+// Run `deployboat help` for all commands.
+import { saveLogin, connection, appNameFor, api, resolveApp, deploy } from "./lib.js";
 
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, join } from "node:path";
-import { Readable } from "node:stream";
+const argv = process.argv.slice(2);
+const flag = (n) => { const i = argv.indexOf(`--${n}`); return i > -1 ? argv[i + 1] : undefined; };
+const has = (n) => argv.includes(`--${n}`);
+const positional = argv.filter((a, i) => !a.startsWith("--") && !(argv[i - 1]?.startsWith("--") && !["--json"].includes(argv[i - 1])));
+const [cmd, ...args] = positional;
+const json = has("json");
 
-const globalFile = join(homedir(), ".deployboat", "config.json");
-const projectFile = ".deployboat.json"; // remembers the app name per project
-
-const readJson = (f) => (existsSync(f) ? JSON.parse(readFileSync(f, "utf8")) : {});
-const flag = (n) => { const i = process.argv.indexOf(`--${n}`); return i > -1 ? process.argv[i + 1] : undefined; };
-const die = (msg) => { console.error(`✗ ${msg}`); process.exit(1); };
-
-const [cmd, ...args] = process.argv.slice(2);
-
-if (cmd === "login") {
-  const [server, token] = args;
-  if (!server || !token) die("Usage: deployboat login <server-url> <token>");
-  mkdirSync(join(homedir(), ".deployboat"), { recursive: true });
-  writeFileSync(globalFile, JSON.stringify({ server: server.replace(/\/$/, ""), token }, null, 2), { mode: 0o600 });
-  console.log("✓ Logged in. Now run: deployboat deploy");
-} else if (cmd === "deploy") {
-  await deploy();
-} else {
-  console.log("Usage:\n  deployboat login <server-url> <token>\n  deployboat deploy [--name my-app]");
+const out = (data, text) => console.log(json ? JSON.stringify(data) : text);
+function fail(msg) {
+  if (json) console.log(JSON.stringify({ ok: false, error: msg }));
+  else console.error(`✗ ${msg}`);
+  process.exit(1);
 }
 
-async function deploy() {
-  const saved = readJson(globalFile);
-  const server = flag("server") ?? process.env.DEPLOYBOAT_URL ?? saved.server;
-  const token = flag("token") ?? process.env.DEPLOYBOAT_TOKEN ?? saved.token;
-  if (!server || !token) die("Not logged in. Run: deployboat login <server-url> <token>");
+const HELP = `Deploy Boat — publish any project to your own server.
 
-  const project = readJson(projectFile);
-  const name = flag("name") ?? project.name ??
-    basename(process.cwd()).toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
-  writeFileSync(projectFile, JSON.stringify({ name }, null, 2));
+  deployboat login <server-url> <token>   connect this computer (once)
+  deployboat deploy [folder]              publish a folder (default: this one)
+  deployboat apps                         list your apps
+  deployboat status                       this app's status and address
+  deployboat logs [--lines 100]           this app's recent output
+  deployboat env list                     this app's variables
+  deployboat env set KEY=value …          add or change variables (restarts the app)
+  deployboat env unset KEY …              remove variables (restarts the app)
+  deployboat mcp                          run as an MCP server for AI agents
 
-  console.log(`→ Uploading ${name}…`);
-  const tar = spawn("tar", ["-cz", "--exclude=node_modules", "--exclude=.git", "--exclude=.env", "-f", "-", "."]);
+Options:
+  --name <app>        use this app instead of the one for this folder
+  --json              print machine-readable JSON (for scripts and AI agents)
+  --server, --token   connect without logging in (or DEPLOYBOAT_URL / DEPLOYBOAT_TOKEN)`;
 
-  const res = await fetch(`${server}/api/deploy/${name}`, {
-    method: "POST",
-    headers: { authorization: `Bearer ${token}`, "content-type": "application/gzip" },
-    body: Readable.toWeb(tar.stdout),
-    duplex: "half",
-  }).catch((e) => die(`Can't reach ${server} (${e.cause?.code ?? e.message})`));
+try {
+  const conn = () => connection({ server: flag("server"), token: flag("token") });
+  const app = async () => resolveApp(conn(), appNameFor(".", flag("name")));
 
-  if (!res.ok) die((await res.json().catch(() => ({}))).error ?? `Server error ${res.status}`);
-
-  // The app may have been renamed in the dashboard. Remember the new name.
-  const current = res.headers.get("x-app-name");
-  if (current && current !== name) writeFileSync(projectFile, JSON.stringify({ name: current }, null, 2));
-
-  // Stream the build log. Last line is "LIVE <url>" or "FAILED <reason>".
-  let ok = false, buf = "";
-  const decoder = new TextDecoder();
-  for await (const chunk of res.body) {
-    buf += decoder.decode(chunk, { stream: true });
-    const lines = buf.split("\n"); buf = lines.pop();
-    for (const line of lines) {
-      if (line.startsWith("LIVE ")) { ok = true; console.log(`\n✓ Live: ${line.slice(5)}`); }
-      else if (line.startsWith("FAILED ")) console.error(`\n✗ Deploy failed: ${line.slice(7)}`);
-      else console.log(`  ${line}`);
+  switch (cmd) {
+    case "login": {
+      const [server, token] = args;
+      if (!server || !token) fail("Usage: deployboat login <server-url> <token>");
+      saveLogin(server, token);
+      await api({ server: server.replace(/\/$/, ""), token }, "/api/apps"); // check it works
+      out({ ok: true }, "✓ Connected. Now run: deployboat deploy");
+      break;
     }
+
+    case "deploy": {
+      if (!json) console.log("→ Uploading…");
+      const r = await deploy({ dir: args[0] ?? ".", name: flag("name"), conn: conn(), onLine: json ? undefined : (l) => console.log(`  ${l}`) });
+      if (json) console.log(JSON.stringify({ ...r, log: r.log.slice(-40) }));
+      else if (r.ok) console.log(`\n✓ Live: ${r.url}`);
+      else console.error(`\n✗ Deploy failed: ${r.error}`);
+      process.exit(r.ok ? 0 : 1);
+    }
+
+    case "apps": {
+      const list = await api(conn(), "/api/apps");
+      out(list, list.length ? list.map((a) => `${a.name.padEnd(24)} ${a.url}`).join("\n") : "No apps yet.");
+      break;
+    }
+
+    case "status": {
+      const a = await api(conn(), `/api/apps/${await app()}`);
+      const state = a.building ? "building" : a.stopped ? "stopped" : a.state;
+      out({ name: a.name, url: a.url, state, lastDeploy: a.deploys[0] ?? null },
+        `${a.displayName}\n  address: ${a.url}\n  state:   ${state}\n  last deploy: ${a.deploys[0]?.status ?? "none"} (${a.deploys[0]?.created_at ?? "never"} UTC)`);
+      break;
+    }
+
+    case "logs": {
+      const text = await api(conn(), `/api/apps/${await app()}/logs?lines=${Number(flag("lines")) || 100}`);
+      out({ logs: text }, text || "No output yet.");
+      break;
+    }
+
+    case "env": {
+      const [action, ...pairs] = args;
+      const base = `/api/apps/${await app()}/env`;
+      if (action === "set") {
+        if (!pairs.length) fail("Usage: deployboat env set KEY=value");
+        for (const p of pairs) {
+          const i = p.indexOf("=");
+          if (i < 1) fail(`"${p}" should look like KEY=value`);
+          await api(conn(), base, { method: "PUT", body: { key: p.slice(0, i), value: p.slice(i + 1) } });
+        }
+        out({ ok: true }, `✓ Saved ${pairs.length} variable${pairs.length === 1 ? "" : "s"}. The app restarted.`);
+      } else if (action === "unset") {
+        for (const k of pairs) await api(conn(), `${base}/${encodeURIComponent(k)}`, { method: "DELETE" });
+        out({ ok: true }, `✓ Removed. The app restarted.`);
+      } else {
+        // Values are hidden unless you ask for them: they're often secrets.
+        const vars = await api(conn(), base);
+        out(vars.map(({ key, builtin }) => ({ key, builtin })),
+          vars.map((v) => `${v.key}${v.builtin ? "  (built-in)" : ""}`).join("\n") || "No variables.");
+      }
+      break;
+    }
+
+    case "mcp":
+      await import("./mcp.js");
+      break;
+
+    default:
+      console.log(HELP);
   }
-  process.exit(ok ? 0 : 1);
+} catch (e) {
+  fail(e.message);
 }

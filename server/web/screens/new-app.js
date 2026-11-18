@@ -27,30 +27,79 @@ export function openNewApp() {
   }));
 }
 
+// Step 1 of Local and AI: make a limited agent token. Shows once, then calls `ready(token)`.
+function tokenStep(pane, defaultName, ready) {
+  pane.innerHTML = `
+    <form class="card pad form" id="mk" style="background:var(--bg)">
+      <b>First, create a token</b>
+      <p class="note" style="margin-top:-6px">It can deploy apps and read their logs, but can't delete anything or change the server.
+        You can revoke it any time in Settings.</p>
+      <div class="row"><input name="name" value="${esc(defaultName)}" style="flex:1;min-width:180px" required>
+        <button class="btn primary">Create token</button></div>
+    </form>`;
+  pane.querySelector("#mk").onsubmit = async (e) => {
+    e.preventDefault();
+    try { const r = await api("/api/tokens", { method: "POST", body: { name: e.target.name.value } }); ready(r.token); }
+    catch (err) { toast(err.message); }
+  };
+}
+
 // A code box with a copy button.
 const codeBox = (text) => `<div class="code"><pre>${esc(text)}</pre><button class="btn" data-copy>${icon("copy")} Copy</button></div>`;
 const wireCopy = (el, text) => el.querySelectorAll("[data-copy]").forEach((b, i) => (b.onclick = () => copy(Array.isArray(text) ? text[i] : text)));
 
 async function local(pane) {
   const s = await api("/api/settings");
-  const login = `npx deployboat login ${s.dashboard} ${s.token}`;
-  const deploy = "npx deployboat deploy";
-  pane.innerHTML = `
-    <ol class="steps">
-      <li><b>Connect your computer</b> (once)${codeBox(login)}</li>
-      <li><b>Open your project folder and publish</b>${codeBox(deploy)}</li>
-    </ol>
-    <p class="note">You need Node.js. Run the same command again to publish updates.</p>`;
-  wireCopy(pane, [login, deploy]);
+  tokenStep(pane, "My computer", (token) => {
+    const login = `npx deployboat login ${s.dashboard} ${token}`;
+    const deploy = "npx deployboat deploy";
+    pane.innerHTML = `
+      <ol class="steps">
+        <li><b>Connect your computer</b> (once)${codeBox(login)}</li>
+        <li><b>Open your project folder and publish</b>${codeBox(deploy)}</li>
+      </ol>
+      <p class="note">You need Node.js. Run the same command again to publish updates.
+        ${icon("lock")} This token is shown only once. Copy it now.</p>`;
+    wireCopy(pane, [login, deploy]);
+  });
 }
 
+// Two ways for an AI agent: paste a message, or connect Deploy Boat as a tool (MCP).
 async function ai(pane) {
-  const prompt = await api("/api/agent-prompt");
+  const [template, s] = await Promise.all([api("/api/agent-prompt"), api("/api/settings")]);
+  tokenStep(pane, "AI agent", (token) => aiReady(pane, template.replaceAll("<TOKEN>", token), s, token));
+}
+
+function aiReady(pane, prompt, s, token) {
+  const claude = `claude mcp add deployboat -e DEPLOYBOAT_URL=${s.dashboard} -e DEPLOYBOAT_TOKEN=${token} -- npx -y deployboat mcp`;
+  const cursor = JSON.stringify({ mcpServers: { deployboat: {
+    command: "npx", args: ["-y", "deployboat", "mcp"], env: { DEPLOYBOAT_URL: s.dashboard, DEPLOYBOAT_TOKEN: token },
+  } } }, null, 2);
+
   pane.innerHTML = `
-    <p class="muted" style="margin-bottom:10px">Paste this into Claude Code, Cursor, Codex or any agent that can run commands. Then say <b>"publish it"</b>.</p>
-    ${codeBox(prompt)}
-    <p class="note">${icon("lock")} This message contains your server token. Only paste it into tools you trust.</p>`;
-  wireCopy(pane, prompt);
+    <div class="tabs" style="margin-bottom:12px">
+      <a href="#" data-t="msg" class="on">Paste a message</a>
+      <a href="#" data-t="mcp">Connect as a tool (MCP)</a>
+    </div>
+    <div data-p="msg">
+      <p class="muted" style="margin-bottom:10px">Works with any agent that can run commands. Paste this, then say <b>"publish it"</b>.</p>
+      ${codeBox(prompt)}
+    </div>
+    <div data-p="mcp" hidden>
+      <p class="muted" style="margin-bottom:10px">Gives your agent Deploy Boat tools: deploy, logs, status, variables. Set it up once, then just say <b>"publish it"</b> in any project.</p>
+      <b>Claude Code</b> <span class="note">run in your terminal</span>
+      ${codeBox(claude)}
+      <div style="margin-top:14px"><b>Cursor, Windsurf, Claude Desktop</b> <span class="note">add to the MCP settings file</span></div>
+      ${codeBox(cursor)}
+    </div>
+    <p class="note" style="margin-top:12px">${icon("lock")} These contain the new token, shown only once. It can deploy and read logs, nothing more. Revoke it in Settings if it leaks.</p>`;
+
+  wireCopy(pane, [prompt, claude, cursor]);
+  pane.querySelectorAll("[data-t]").forEach((t) => (t.onclick = (e) => {
+    e.preventDefault();
+    pane.querySelectorAll("[data-t]").forEach((x) => x.classList.toggle("on", x === t));
+    pane.querySelectorAll("[data-p]").forEach((p) => (p.hidden = p.dataset.p !== t.dataset.t));
+  }));
 }
 
 function git(pane, close) {

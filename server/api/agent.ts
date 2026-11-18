@@ -1,23 +1,40 @@
-// The message users paste into their AI agent so it can publish for them.
+// What AI agents need to know. Two versions of the same guide:
+//  - agentGuide: just the rules (served to the MCP `setup_guide` tool)
+//  - agentPrompt: rules + how to connect, for pasting into a chat.
+//    It contains <TOKEN>; the dashboard swaps in a fresh agent token.
 import type { Context } from "hono";
 import { config } from "../lib/config.ts";
+
+const RULES = `How apps must be written for Deploy Boat:
+- The app must listen on the port in the PORT environment variable.
+- Don't add a Dockerfile or deploy config. The stack is detected automatically
+  (static HTML, Node, Python, Go, PHP, …). A Node app needs a "start" script.
+- A PostgreSQL database is ready. Use the DATABASE_URL environment variable.
+- File storage (S3-compatible) is ready: S3_ENDPOINT, S3_REGION, S3_BUCKET,
+  S3_ACCESS_KEY, S3_SECRET_KEY. Set forcePathStyle: true in the S3 client.
+  Uploaded files are public at S3_PUBLIC_URL + "/" + key.
+- Don't use external database or storage services, and never hard-code secrets.
+  If the app needs an API key, ask the user for it and save it as a variable
+  (set_env tool, or: deployboat env set KEY=value).
+- If a deploy fails, read the error and the log, fix the code, and deploy again.
+- If the app crashes after deploying, read its logs (get_logs tool, or: deployboat logs).
+- Keep the .deployboat.json file. It remembers which app the folder belongs to.`;
+
+export const agentGuide = (c: Context) => c.text(RULES + "\n");
 
 export const agentPrompt = (c: Context) => c.text(`You can publish this project to my Deploy Boat server.
 
 To publish it (or publish an update), run this in the project's root folder:
 
-  npx deployboat deploy --server https://${config.dashboardHost} --token ${config.token}
+  npx deployboat deploy --json --server https://${config.dashboardHost} --token <TOKEN>
 
-It prints a live URL at the end. Show it to me.
+It prints one line of JSON. On success it has "url": show that URL to me.
+On failure it has "error" and the last lines of the build "log".
 
-Rules:
-- The app must listen on the port in the PORT environment variable.
-- Don't add a Dockerfile or deploy config. The stack is detected automatically.
-- A PostgreSQL database is ready. Use the DATABASE_URL environment variable.
-- File storage (S3-compatible) is ready: S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY.
-  Set forcePathStyle: true in the S3 client. Uploaded files are public at S3_PUBLIC_URL + "/" + key.
-- Don't use external database or storage services, and don't hard-code secrets.
-  If the app needs an API key, ask me to add it in the Deploy Boat dashboard under Variables.
-- If the deploy fails, read the error, fix the code, and deploy again.
-- Keep the generated .deployboat.json file. It remembers which app this folder belongs to.
+Other commands (same --server and --token):
+  npx deployboat logs              the app's recent output
+  npx deployboat env set KEY=value add a secret or setting (restarts the app)
+  npx deployboat status            is it running, and where
+
+${RULES}
 `);

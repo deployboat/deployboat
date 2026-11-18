@@ -57,7 +57,7 @@ export async function crons(box, base) {
             </dl>
             <div class="row">
               <button class="btn" data-run="${j.id}" ${j.running ? "disabled" : ""}>${icon("play")} Run now</button>
-              <button class="btn" data-toggle="${j.id}">${j.enabled ? `${icon("stop")} Pause` : `${icon("play")} Resume`}</button>
+              <button class="btn" data-toggle="${j.id}">${j.enabled ? `${icon("pause")} Pause` : `${icon("play")} Resume`}</button>
               <button class="btn" data-edit="${j.id}">Edit</button>
               <button class="btn danger" data-del="${j.id}">${icon("trash")}</button>
             </div>
