@@ -27,9 +27,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/osbulbul/deploy-boat.git",
+    "url": "git+https://github.com/deployboat/deployboat.git",
     "directory": "cli"
   },
-  "homepage": "https://github.com/osbulbul/deploy-boat#readme",
-  "bugs": "https://github.com/osbulbul/deploy-boat/issues"
+  "homepage": "https://github.com/deployboat/deployboat#readme",
+  "bugs": "https://github.com/deployboat/deployboat/issues"
 }

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Deploy Boat installer (and updater). Ubuntu 22.04 / 24.04 or Debian 12. Run as root:
-#   curl -fsSL https://raw.githubusercontent.com/osbulbul/deploy-boat/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/deployboat/deployboat/main/install.sh | sudo bash
 #
 # Safe to run again: it skips what's already there and updates the rest.
 # Everything the commands print goes to the log file; the screen shows one line per step.
 set -euo pipefail
 
-REPO="${DEPLOYBOAT_REPO:-https://github.com/osbulbul/deploy-boat.git}"
+REPO="${DEPLOYBOAT_REPO:-https://github.com/deployboat/deployboat.git}"
 DIR=/opt/deployboat
 DATA=/var/lib/deployboat
 LOG=/var/log/deployboat-install.log
@@ -64,7 +64,7 @@ step() {
     line ""
     line "  Full log: ${B}${LOG}${X}"
     line "  It's safe to run the installer again. If it keeps failing, open an issue:"
-    line "  https://github.com/osbulbul/deploy-boat/issues"
+    line "  https://github.com/deployboat/deployboat/issues"
     line ""
     exit 1
   fi
@@ -133,6 +133,7 @@ start_services() {
 
 get_code() {
   if [ -d "$DIR/.git" ]; then
+    git -C "$DIR" remote set-url origin "$REPO"   # follow the repo if it moved (e.g. to the deployboat org)
     git -C "$DIR" fetch -q origin main
     git -C "$DIR" reset -q --hard origin/main   # the server copy is never edited by hand
   else

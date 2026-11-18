@@ -1,6 +1,6 @@
 # deployboat
 
-The command line for [Deploy Boat](https://github.com/osbulbul/deploy-boat):
+The command line for [Deploy Boat](https://github.com/deployboat/deployboat):
 publish any project to your own server.
 
 ```sh
@@ -36,4 +36,4 @@ claude mcp add deployboat -e DEPLOYBOAT_URL=<dashboard-url> -e DEPLOYBOAT_TOKEN=
 
 The dashboard (New app → With my AI agent) shows this with your details filled in.
 
-Don't have a server yet? See the [install guide](https://github.com/osbulbul/deploy-boat#install).
+Don't have a server yet? See the [install guide](https://github.com/deployboat/deployboat#install).
