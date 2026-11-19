@@ -86,7 +86,7 @@ npx deployboat deploy                          # in any project folder
 ```
 
 ```
-✓ Live: https://my-app.95.216.148.189.nip.io
+✓ Live: https://my-app.1.2.3.4.nip.io
 ```
 
 Or connect a **GitHub, GitLab or any Git repo**, public or private, and redeploy
