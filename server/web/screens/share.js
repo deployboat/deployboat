@@ -16,7 +16,7 @@ export async function share(box, base) {
       <div id="creds" class="row" style="margin-top:14px;align-items:flex-end" ${isPrivate ? "" : "hidden"}>
         <label class="form" style="flex:1;min-width:140px;gap:4px">Username<input name="username" value="${esc(s.username)}" autocomplete="off"></label>
         <label class="form" style="flex:1;min-width:160px;gap:4px">Password
-          <input name="password" type="password" placeholder="${s.password ? "unchanged" : "choose a password"}" autocomplete="new-password"></label>
+          <input name="password" type="password" placeholder="${s.hasPassword ? "unchanged" : "choose a password"}" autocomplete="new-password"></label>
       </div>
       <div class="row spread" style="margin-top:14px">
         <span class="note">Files at files.… stay public either way.</span>
@@ -31,7 +31,7 @@ export async function share(box, base) {
         <div style="display:grid;gap:12px;min-width:0">
           <div><span class="note">Address</span>${line(s.url)}</div>
           ${isPrivate ? `
-            <div><span class="note">Login</span>${line(`${s.username} / ${s.password ?? ""}`, s.password ?? "")}</div>
+            <div><span class="note">Username (the password isn't stored, so it can't be shown. Forgot it? Choose a new one above.)</span>${line(s.username)}</div>
             <div><span class="note">Private link: opens the site without the password prompt</span>${line(s.privateLink)}
               <button class="btn" id="reset" style="margin-top:8px">${icon("restart")} Reset link</button>
               <span class="note">Old private links stop working.</span></div>` : ""}
@@ -39,7 +39,7 @@ export async function share(box, base) {
       </div>
     </div>`;
 
-  // Copy buttons. The login row copies only the password.
+  // Copy buttons.
   box.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => copy(b.dataset.copy)));
 
   const form = box.querySelector("#who"), creds = box.querySelector("#creds");

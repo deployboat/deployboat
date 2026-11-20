@@ -12,7 +12,7 @@ const view = (app: string) => {
     url: appUrl(app),
     mode: s.mode,
     username: s.username,
-    password: s.password,
+    hasPassword: Boolean(s.password_hash), // the password itself is never stored, so never sent
     privateLink: s.mode === "password" && s.token ? `${appUrl(app)}/?share=${s.token}` : null,
   };
 };
@@ -25,7 +25,7 @@ share.put("/:name/share", async (c) => {
   if (mode !== "public" && mode !== "password") return c.json({ error: "Choose public or password protected." }, 400);
   if (mode === "password") {
     const cur = getShare(name);
-    if (!password && !cur.password) return c.json({ error: "Choose a password." }, 400);
+    if (!password && !cur.password_hash) return c.json({ error: "Choose a password." }, 400);
     if (password && String(password).length < 4) return c.json({ error: "Use at least 4 characters for the password." }, 400);
     if (username && !/^[\w.@-]{1,40}$/.test(username)) return c.json({ error: "Username: letters, numbers, . _ @ - only." }, 400);
   }
