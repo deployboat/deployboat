@@ -146,6 +146,11 @@ To set it up during install:
 
 **What server do I need?** Ubuntu 22.04 / 24.04 or Debian 12. 1–2 GB of memory is enough to start.
 
+**How do I update?** Run the install command again, or click **Update now** in Server Doctor when it
+says a new version is out. Apps and data aren't touched. Each version and what changed is on the
+[releases page](https://github.com/deployboat/deployboat/releases). To install a specific version,
+or go back to one: `curl -fsSL deployboat.github.io/install.sh | sudo bash -s -- --version v0.5.0`
+
 **Is it free?** Yes, open source under the MIT license. You only pay for your server.
 
 **Can I host apps my AI wrote?** That's exactly what it's for.

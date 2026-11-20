@@ -6,6 +6,12 @@
 #   curl -fsSL deployboat.github.io/install.sh | sudo bash -s -- --domain example.com
 # You can also add or change the domain later, in the dashboard under Settings.
 #
+# Which version:
+#   (nothing)            the latest release (recommended)
+#   --version v0.5.0     that exact release. Also how you go back to an older one.
+#   --edge               the newest code on main, not released yet. For testing.
+#                        Remembered: later updates stay on edge until you pick a version.
+#
 # Safe to run again: it skips what's already there and updates the rest.
 # Everything the commands print goes to the log file; the screen shows one line per step.
 set -euo pipefail
@@ -15,13 +21,18 @@ DIR=/opt/deployboat
 DATA=/var/lib/deployboat
 LOG=/var/log/deployboat-install.log
 UNIT_FILE=/etc/systemd/system/deployboat.service
+CHANNEL_FILE=$DATA/channel   # contains "edge" if this server follows main
 
 # --domain example.com (or DOMAIN=example.com). Optional.
 DOMAIN="${DOMAIN:-}"
+WANT=""   # "", "edge", or a version like v0.5.0
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN="${2:-}"; shift 2 || shift ;;
     --domain=*) DOMAIN="${1#*=}"; shift ;;
+    --version) WANT="${2:-}"; shift 2 || shift ;;
+    --version=*) WANT="${1#*=}"; shift ;;
+    --edge) WANT=edge; shift ;;
     *) shift ;;
   esac
 done
@@ -151,16 +162,46 @@ start_services() {
     caddy:2 caddy run --config /data/config.json
 }
 
+# The newest release tag, like v0.5.0. Empty if there are no releases yet.
+latest_release() {
+  git ls-remote --tags --refs --sort=-v:refname "$REPO" 'v*' | head -1 | sed 's#.*refs/tags/##'
+}
+
+# The version this server runs: its release tag, or the commit for edge.
+current_version() {
+  git -C "$DIR" describe --tags --exact-match 2>/dev/null || git -C "$DIR" log -1 --format='%h (main)'
+}
+
 get_code() {
-  if [ -d "$DIR/.git" ]; then
-    git -C "$DIR" remote set-url origin "$REPO"   # follow the repo if it moved (e.g. to the deployboat org)
-    git -C "$DIR" fetch -q origin main
-    git -C "$DIR" reset -q --hard origin/main   # the server copy is never edited by hand
+  # Which code: --edge, --version, what this server followed before, or the latest release.
+  if [ -z "$WANT" ] && [ "$(cat "$CHANNEL_FILE" 2>/dev/null)" = edge ]; then WANT=edge; fi
+  if [ "$WANT" = edge ]; then
+    REF=main
+  elif [ -n "$WANT" ]; then
+    REF="v${WANT#v}"   # accept 0.5.0 or v0.5.0
+    [ -n "$(git ls-remote --tags "$REPO" "refs/tags/$REF")" ] || { echo "There's no version $REF."; return 1; }
   else
-    git clone -q "$REPO" "$DIR"
+    REF="$(latest_release)"
+    [ -n "$REF" ] || REF=main   # no releases yet
   fi
+  echo "Getting $REF"
+
+  [ -d "$DIR/.git" ] || git clone -q "$REPO" "$DIR"
+  git -C "$DIR" remote set-url origin "$REPO"   # follow the repo if it moved (e.g. to the deployboat org)
+  git -C "$DIR" fetch -q --tags --force origin main
+  # The server copy is never edited by hand, so --force is safe.
+  if [ "$REF" = main ]; then
+    git -C "$DIR" checkout -q --force -B main origin/main
+  else
+    git -C "$DIR" checkout -q --force "refs/tags/$REF"
+  fi
+
+  # Remember edge, so the next plain update (or "Update now") stays on it.
+  mkdir -p "$DATA"
+  if [ "$WANT" = edge ]; then echo edge > "$CHANNEL_FILE"; else rm -f "$CHANNEL_FILE"; fi
+
   (cd "$DIR/server" && npm install --omit=dev --no-audit --no-fund)
-  git -C "$DIR" log -1 --format='Version: %h (%cd)' --date=short
+  echo "Version: $(current_version)"
 }
 
 start_deployboat() {
@@ -254,6 +295,13 @@ if ! $UPDATING && command -v ss >/dev/null; then
   [ -z "$BUSY" ] || fail "Ports 80/443 are already used by another program (maybe nginx or Apache). Stop it first, then run this again."
 fi
 
+# A wrong --version: say so now, not after installing everything. (Needs git; on a brand-new
+# server git comes later, and the "Downloading Deploy Boat" step checks it instead.)
+if [ -n "$WANT" ] && [ "$WANT" != edge ] && command -v git >/dev/null; then
+  [ -n "$(git ls-remote --tags "$REPO" "refs/tags/v${WANT#v}")" ] \
+    || fail "There's no version v${WANT#v}. See the releases: https://github.com/deployboat/deployboat/releases"
+fi
+
 IP="$(curl -fsS --max-time 10 https://api.ipify.org || true)"
 [ -n "$IP" ] || fail "Couldn't find this server's public IP address."
 
@@ -287,7 +335,7 @@ NIP_URL="https://deployboat.$IP.nip.io"
 URL="$NIP_URL"
 if [ -n "$DOMAIN" ] && $DOMAIN_OK; then URL="https://deployboat.$DOMAIN"; fi
 TOKEN="$(cat "$DATA/token")"
-VERSION="$(git -C "$DIR" log -1 --format='%h' 2>/dev/null || echo '?')"
+VERSION="$(current_version)"
 
 line ""
 if $UPDATING; then

@@ -114,7 +114,7 @@ export async function doctorScreen(view) {
           ${meta(i)}
         </div>
         ${i.link || i.fix ? `<div class="doc-iact">
-          ${i.link ? `<a class="btn" href="${esc(i.link)}">Open</a>` : ""}
+          ${i.link ? `<a class="btn" href="${esc(i.link)}" ${i.link.startsWith("http") ? 'target="_blank"' : ""}>${i.link.includes("/releases/") ? "What's new" : "Open"}</a>` : ""}
           ${i.fix ? `<button class="btn" data-fix="${esc(i.id)}" ${data.fixing ? "disabled" : ""}>${esc(i.fix)}</button>` : ""}
         </div>` : ""}
       </div>`;
@@ -135,7 +135,7 @@ export async function doctorScreen(view) {
             ${meta(i)}
           </div>
           <div class="doc-actions">
-            ${i.link ? `<a class="btn" href="${esc(i.link)}">${i.link.includes("/logs") ? "See logs" : "Open"}</a>` : ""}
+            ${i.link ? `<a class="btn" href="${esc(i.link)}" ${i.link.startsWith("http") ? 'target="_blank"' : ""}>${i.link.includes("/logs") ? "See logs" : i.link.includes("/releases/") ? "What's new" : "Open"}</a>` : ""}
             ${i.fix && !f ? `<button class="btn ${i.status === "bad" ? "primary" : ""}" data-fix="${esc(i.id)}" ${busy ? 'disabled title="Another fix is running"' : ""}>${esc(i.fix)}</button>` : ""}
           </div>
         </div>
