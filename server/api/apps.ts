@@ -21,6 +21,7 @@ import { crons } from "./crons.ts";
 import { enabledServices, addService, removeService, isService } from "../services/index.ts";
 import { getAppMail, saveAppMail } from "../services/email/index.ts";
 import { sendEmail } from "../alerts/channels/email.ts";
+import { dataUsage, DATA_DIR } from "../lib/appdata.ts";
 
 export const apps = new Hono();
 
@@ -169,6 +170,9 @@ apps.get("/:name/database", async (c) => {
   const name = c.req.param("name");
   return c.json({ url: getEnv(name).DATABASE_URL ?? null, tables: await tables(name) });
 });
+
+// The app's data folder (DATA_DIR): where it is and how much is in it.
+apps.get("/:name/data", async (c) => c.json({ path: DATA_DIR, ...(await dataUsage(c.req.param("name"))) }));
 
 apps.get("/:name/storage", async (c) => {
   const name = c.req.param("name");

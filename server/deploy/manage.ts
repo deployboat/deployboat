@@ -9,6 +9,7 @@ import "./git.ts"; // makes sure the git table exists
 import "../lib/domains.ts"; // and the domains table
 import "../lib/share.ts"; // and the share table
 import { removeCrons } from "../crons/index.ts";
+import { renameDataDir, removeDataDir } from "../lib/appdata.ts";
 import "../backups/index.ts"; // makes sure the backups table exists
 import "../monitor/index.ts"; // and the metrics tables
 
@@ -37,8 +38,10 @@ export async function activate(app: string, image: string) {
   await start(app, image, () => {});
 }
 
-// Remove the app and its address. Its database and files are kept on purpose.
+// Remove the app and its address. Its database, files and data folder are kept on purpose
+// (a preview's are deleted: they're throwaway copies).
 export async function remove(app: string) {
+  const isPreview = !!(db.prepare("SELECT preview_of FROM apps WHERE name = ?").get(app) as { preview_of: string | null } | undefined)?.preview_of;
   // Previews of this app go too, with their (throwaway) data.
   for (const { name } of db.prepare("SELECT name FROM apps WHERE preview_of = ?").all(app) as { name: string }[]) {
     await removeAllServices(name).catch(() => {});
@@ -54,6 +57,7 @@ export async function remove(app: string) {
   db.prepare("DELETE FROM domains WHERE app = ?").run(app);
   db.prepare("DELETE FROM share WHERE app = ?").run(app);
   removeCrons(app);
+  if (isPreview) removeDataDir(app);
   await syncRoutes();
 }
 
@@ -79,6 +83,7 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("INSERT OR REPLACE INTO aliases (old, name) VALUES (?, ?)").run(oldName, newName);
 
   await renameServices(oldName, newName);
+  renameDataDir(oldName, newName);
   await removeNetwork(oldName);
   if (image) await start(newName, image, () => {});
   await syncRoutes();

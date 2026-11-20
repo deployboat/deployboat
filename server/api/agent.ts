@@ -9,6 +9,9 @@ const RULES = `How apps must be written for Deploy Boat:
 - The app must listen on the port in the PORT environment variable.
 - Don't add a Dockerfile or deploy config. The stack is detected automatically
   (static HTML, Node, Python, Go, PHP, …). A Node app needs a "start" script.
+- Every deploy starts a fresh container: files the app writes are LOST on the next deploy,
+  except in the data folder. Save files, uploads and SQLite databases in the folder in
+  the DATA_DIR environment variable (it's /data). Example: path.join(process.env.DATA_DIR, "app.db").
 - No database or file storage by default. Add them only if the app needs them:
   - PostgreSQL database: deploy with services ["database"] (MCP deploy tool),
     or: deployboat deploy --with database   (later: deployboat add database).

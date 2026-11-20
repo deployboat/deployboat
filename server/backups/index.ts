@@ -51,7 +51,7 @@ async function backupApp(app: string, say: (l: string) => void) {
   try {
     say(`${app}:`);
     const { file, meta } = await pack(app, (l) => say(`  ${l}`));
-    const note = [meta.database && "database", meta.files && `${meta.files} files`].filter(Boolean).join(", ") || "empty";
+    const note = [meta.database && "database", meta.files && `${meta.files} files`, meta.dataFolder && "data folder"].filter(Boolean).join(", ") || "empty";
     db.prepare("UPDATE backups SET status = 'done', file = ?, size = ?, note = ? WHERE id = ?").run(file, statSync(file).size, note, id);
 
     const r = getSettings().remote;
