@@ -22,6 +22,7 @@ import { isService } from "../services/index.ts";
 import { serverDomain, saveServerDomain, domainOwner } from "../lib/domains.ts";
 import { checkDns, cleanHost, looksLikeHost } from "../lib/dns.ts";
 import { syncRoutes } from "../deploy/route.ts";
+import { versionInfo } from "../lib/version.ts";
 
 export const app = new Hono();
 
@@ -49,6 +50,9 @@ app.get("/api/resolve/:name", (c) => {
   const name = resolveName(c.req.param("name").toLowerCase());
   return db.prepare("SELECT 1 FROM apps WHERE name = ?").get(name) ? c.json({ name }) : c.json({ error: `No app called "${name}" yet. Deploy it first.` }, 404);
 });
+
+// Which Deploy Boat this is, and whether there's a newer one (asks GitHub at most once an hour).
+app.get("/api/version", async (c) => c.json(await versionInfo()));
 
 app.get("/api/settings", (c) =>
   c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain, nipDomain: config.nipDomain }),

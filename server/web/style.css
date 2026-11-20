@@ -441,3 +441,10 @@ details.guide summary { cursor: pointer; }
   .bk-setup { grid-template-columns: 1fr; }
   .bk-size { text-align: left; }
 }
+
+/* version at the bottom of the sidebar */
+.ver { display: grid; gap: 4px; padding: 8px 10px; font-size: 12px; color: var(--muted); text-decoration: none; border-radius: 8px; }
+.ver:hover { color: var(--ink); background: var(--bg); }
+.verup { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 600; }
+.verup svg.i { width: 13px; height: 13px; }
+@media (max-width: 760px) { .ver { display: none !important; } }

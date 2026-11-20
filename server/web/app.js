@@ -162,6 +162,7 @@ async function render() {
   const [, page, name, tab] = hash.split("/");
 
   drawNav(page, name && decodeURIComponent(name), tab || "overview");
+  drawVersion();
 
   // Each page draws into its own box. When you navigate away, the old box is
   // removed, so slow loads or timers from the old page can't overwrite the new one.
@@ -190,6 +191,19 @@ async function render() {
     clearTimeout(spinner);
     if (id === current && e.message !== "Logged out") box.innerHTML = `<div class="card pad">${esc(e.message)}</div>`;
   }
+}
+
+// Version at the bottom of the sidebar, with a note when an update is out. Once per page load.
+let versionShown = false;
+function drawVersion() {
+  if (versionShown) return;
+  versionShown = true;
+  api("/api/version").then((v) => {
+    const el = document.getElementById("ver");
+    el.innerHTML = `Deploy Boat ${esc(v.current)}${v.update ? `<span class="verup">${icon("download")} Update available</span>` : ""}`;
+    el.title = v.update ? `${v.update}: see Server Doctor to update` : "You're on the latest version";
+    el.hidden = false;
+  }).catch(() => { versionShown = false; });
 }
 
 document.getElementById("logout").onclick = async () => { await api("/auth/logout", { method: "POST" }); showLogin(); };

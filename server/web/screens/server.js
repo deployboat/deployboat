@@ -29,6 +29,7 @@ export async function serverScreen(page) {
           <dt>Load (1/5/15 min)</dt><dd>${s.load.map((l) => l.toFixed(2)).join(" · ")}</dd>
           <dt>Docker</dt><dd>${esc(s.docker)}</dd>
           <dt>Node.js</dt><dd>${esc(s.node)}</dd>
+          <dt>Deploy Boat</dt><dd>${esc(s.deployboat)}</dd>
         </dl>
       </div>
       <div class="row spread" style="margin:22px 0 10px"><b>Running services</b><span class="muted">${s.containers.length} containers</span></div>

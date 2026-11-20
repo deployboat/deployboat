@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import os from "node:os";
 import { readFileSync } from "node:fs";
+import { CURRENT } from "../lib/version.ts";
 import { run } from "../lib/shell.ts";
 import { config } from "../lib/config.ts";
 import { sample } from "../lib/procs.ts";
@@ -35,6 +36,7 @@ server.get("/", async (c) => {
     memory: { total: os.totalmem(), used: os.totalmem() - os.freemem() },
     disk,
     node: process.version,
+    deployboat: CURRENT,
     docker: dockerVersion,
     containers: containers.map((ct: any) => ({
       name: ct.Names,
