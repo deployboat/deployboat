@@ -36,7 +36,8 @@ export function saveSettings(s: Settings) { setSetting("backups", s); schedule()
 // For the dashboard: never send secrets back.
 export function publicSettings() {
   const s = getSettings();
-  return { enabled: s.enabled, time: s.time, timezone: s.timezone, keep: s.keep, remote: describe(s.remote), remoteType: s.remote?.type ?? null };
+  return { enabled: s.enabled, time: s.time, timezone: s.timezone, keep: s.keep, remote: describe(s.remote), remoteType: s.remote?.type ?? null,
+    nextRun: timer?.nextRun()?.toISOString() ?? null };
 }
 
 let running: Promise<void> | null = null;

@@ -380,3 +380,30 @@ details.guide summary { cursor: pointer; }
   .sethead { flex-wrap: wrap; }
   .sethead .grow { min-width: 200px; }
 }
+
+/* backups */
+.stat.bk-warn b { color: var(--warn); } .stat.bk-bad b { color: var(--bad); }
+.bk-setup { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.bk-sub { font-size: 13.5px; margin: 2px 0 12px; }
+.bk-fields { align-items: flex-end; }
+.bk-fields label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; }
+.bk-fields input[type=time] { width: auto; }
+.bk-fields input[type=number] { width: 70px; }
+.bk-dest { flex-wrap: nowrap; }
+.bk-dest .grow { display: grid; }
+.bk-form { margin-top: 14px; }
+.bk-run { margin-bottom: 14px; overflow: hidden; }
+.bk-run .log { margin: 12px 0 0; max-height: 220px; }
+.bk-run summary { cursor: pointer; font-weight: 500; font-size: 13.5px; color: var(--muted); }
+.bk-run[open] .log { margin: 0 18px 18px; }
+.bk-apphead { margin: 22px 0 8px; }
+.bk-row { flex-wrap: wrap; }
+.bk-row .status { width: 74px; }
+.bk-row .grow { min-width: 160px; display: grid; }
+.bk-where { display: flex; gap: 4px; }
+.bk-size { width: 70px; text-align: right; font-size: 13px; white-space: nowrap; }
+.bk-actions { display: flex; gap: 6px; }
+@media (max-width: 760px) {
+  .bk-setup { grid-template-columns: 1fr; }
+  .bk-size { text-align: left; }
+}
