@@ -56,7 +56,7 @@ export async function serverScreen(page) {
   }
   // Load both at the same time (faster), then show them.
   const [stopHistory] = await Promise.all([history(historyBox), draw()]);
-  page.append(view, historyBox);
+  page.replaceChildren(view, historyBox); // also removes the "Loading…" spinner
   const timer = setInterval(() => draw().catch(() => {}), 10000);
   return () => { clearInterval(timer); stopHistory(); };
 }
