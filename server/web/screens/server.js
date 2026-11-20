@@ -5,9 +5,10 @@ import { rangePicker } from "./ranges.js";
 
 export async function serverScreen(page) {
   // Live numbers redraw every 10s; the history charts only when needed, so hovering isn't interrupted.
-  page.innerHTML = `<div id="live"></div><div id="history"></div>`;
-  const view = page.querySelector("#live");
-  const stopHistory = await history(page.querySelector("#history"));
+  // Both parts are built off-screen and shown together, so the page doesn't appear in pieces.
+  // Until then the page is empty, and the router shows its "Loading…" spinner.
+  const view = document.createElement("div");
+  const historyBox = document.createElement("div");
 
   async function draw() {
     const s = await api("/api/server");
@@ -53,7 +54,9 @@ export async function serverScreen(page) {
       catch (err) { toast(err.message); b.disabled = false; }
     }));
   }
-  await draw();
+  // Load both at the same time (faster), then show them.
+  const [stopHistory] = await Promise.all([history(historyBox), draw()]);
+  page.append(view, historyBox);
   const timer = setInterval(() => draw().catch(() => {}), 10000);
   return () => { clearInterval(timer); stopHistory(); };
 }
