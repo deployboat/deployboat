@@ -19,8 +19,6 @@ import { metrics } from "./metrics.ts";
 import { agentPrompt, agentGuide } from "./agent.ts";
 import { resolveName, db } from "../lib/db.ts";
 import { isService } from "../services/index.ts";
-import { getMail, saveMail } from "../services/email/index.ts";
-import { sendEmail } from "../alerts/channels/email.ts";
 import { serverDomain, saveServerDomain, domainOwner } from "../lib/domains.ts";
 import { checkDns, cleanHost, looksLikeHost } from "../lib/dns.ts";
 import { syncRoutes } from "../deploy/route.ts";
@@ -55,27 +53,6 @@ app.get("/api/resolve/:name", (c) => {
 app.get("/api/settings", (c) =>
   c.json({ token: config.token, dashboard: `https://${config.dashboardHost}`, baseDomain: config.baseDomain, nipDomain: config.nipDomain }),
 );
-
-// Email for apps: the one SMTP provider apps send through. Password never goes back to the browser.
-app.get("/api/settings/mail", (c) => {
-  const m = getMail();
-  return c.json(m.host ? { host: m.host, port: m.port, user: m.user, from: m.from } : null);
-});
-
-app.put("/api/settings/mail", async (c) => {
-  const b = await c.req.json().catch(() => ({}));
-  const old = getMail();
-  const m = { host: String(b.host ?? "").trim(), port: Number(b.port) || 587, user: String(b.user ?? "").trim(),
-    pass: b.pass ? String(b.pass) : old.host ? old.pass : "", from: String(b.from ?? "").trim() };
-  if (!m.host) return c.json({ error: "Fill in the SMTP server." }, 400);
-  if (!b.testTo) return c.json({ error: "Enter an address for the test email." }, 400);
-  try { await sendEmail({ type: "email", ...m, to: String(b.testTo) }, "Deploy Boat: email for apps works", "Your apps can now send email through this provider."); }
-  catch (e) { return c.json({ error: `The test email didn't go through: ${(e as Error).message}` }, 400); }
-  saveMail(m);
-  return c.json({ ok: true });
-});
-
-app.delete("/api/settings/mail", (c) => { saveMail(null); return c.json({ ok: true }); });
 
 // Your own domain for the server (*.example.com) and, optionally, the dashboard.
 const domainView = async () => {

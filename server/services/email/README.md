@@ -1,3 +1,4 @@
 # email
 
-Email for apps through one SMTP provider (set up in Settings). Apps that add it get `SMTP_*` variables.
+Email for apps. Each app connects its own SMTP provider on its Email page in the dashboard.
+The settings are stored as the app's `SMTP_*` variables.

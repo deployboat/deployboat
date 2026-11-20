@@ -19,6 +19,8 @@ import { share } from "./share.ts";
 import { isAdmin } from "./auth.ts";
 import { crons } from "./crons.ts";
 import { enabledServices, addService, removeService, isService } from "../services/index.ts";
+import { getAppMail, saveAppMail } from "../services/email/index.ts";
+import { sendEmail } from "../alerts/channels/email.ts";
 
 export const apps = new Hono();
 
@@ -261,6 +263,28 @@ apps.post("/:name/services/:service", async (c) => {
   } finally {
     unlock(name);
   }
+});
+
+// Email for this app: its own provider (SMTP). The password never goes back to the browser.
+apps.get("/:name/email", (c) => {
+  const m = getAppMail(c.req.param("name"));
+  return c.json(m ? { host: m.host, port: m.port, user: m.user, from: m.from, hasPassword: Boolean(m.pass) } : null);
+});
+
+// Save only if a test email gets through. Then restart, so the app sees the new SMTP_* variables.
+apps.put("/:name/email", async (c) => {
+  const name = c.req.param("name");
+  const b = await c.req.json().catch(() => ({}));
+  const old = getAppMail(name);
+  const m = { host: String(b.host ?? "").trim(), port: Number(b.port) || 587, user: String(b.user ?? "").trim(),
+    pass: b.pass ? String(b.pass) : old?.pass ?? "", from: String(b.from ?? "").trim() };
+  if (!m.host) return c.json({ error: "Fill in the SMTP server." }, 400);
+  if (!b.testTo) return c.json({ error: "Enter an address for the test email." }, 400);
+  try { await sendEmail({ type: "email", ...m, to: String(b.testTo) }, `${displayName(name)}: email works`, "This app can now send email through this provider."); }
+  catch (e) { return c.json({ error: `The test email didn't go through: ${(e as Error).message}` }, 400); }
+  saveAppMail(name, m);
+  await restart(name).catch(() => {}); // fine if it was never deployed
+  return c.json({ ok: true });
 });
 
 // Auto-deploy and PR preview switches; reset the webhook secret.

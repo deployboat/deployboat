@@ -11,3 +11,7 @@ export function getSetting<T>(key: string, fallback: T): T {
 export function setSetting(key: string, value: unknown) {
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)").run(key, JSON.stringify(value));
 }
+
+export function deleteSetting(key: string) {
+  db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+}

@@ -453,7 +453,6 @@ function removeEmailBox(box, base) {
 const SERVICE_TEXT = {
   database: { icon: "db", title: "No database yet", button: "Create database", text: "Add a PostgreSQL database. Your app gets <code>DATABASE_URL</code> and restarts." },
   storage: { icon: "folder", title: "No file storage yet", button: "Create storage", text: "Add S3-compatible storage for uploads and images. Your app gets <code>S3_*</code> variables and restarts." },
-  email: { icon: "mail", title: "No email yet", button: "Add email", text: "Let this app send email through your provider. It gets <code>SMTP_URL</code> and <code>SMTP_*</code> variables and restarts." },
 };
 
 function addServicePage(box, base, service) {
@@ -472,25 +471,55 @@ function addServicePage(box, base, service) {
     try { await api(`${base}/services/${service}`, { method: "POST" }); toast("Added"); dispatchEvent(new HashChangeEvent("hashchange")); }
     catch (err) {
       toast(err.message); b.disabled = false; b.textContent = t.button;
-      if (/Settings/.test(err.message)) box.querySelector(".note").innerHTML = `First connect an email provider in <a href="#/settings">Settings → Email for apps</a>.`;
     }
   };
 }
 
-// Email: shows the variables the app got.
+// Email: this app's own email provider (SMTP), and the variables the app gets from it.
 async function email(box, base, app) {
-  if (!app.services.includes("email")) return addServicePage(box, base, "email");
-  const vars = Object.fromEntries((await api(`${base}/env`)).map((v) => [v.key, v.value]));
+  const m = await api(`${base}/email`);
   box.innerHTML = `
     <div class="card pad">
+      <b>${m ? "Email provider" : "Let this app send email"}</b>
+      <p class="muted" style="margin:2px 0 14px">${m
+        ? `Connected: <b>${esc(m.host)}</b>, sending as ${esc(m.from || m.user)}.`
+        : `Connect an email provider (Resend, Postmark, Mailgun, Brevo, Gmail…). The app gets <code>SMTP_URL</code> and <code>SMTP_*</code> variables and restarts.`}</p>
+      <form class="form">
+        <div class="row"><label style="flex:2">SMTP server<input name="host" value="${esc(m?.host ?? "")}" placeholder="smtp.resend.com" required></label>
+          <label style="flex:1">Port<input name="port" type="number" value="${m?.port ?? 587}"></label></div>
+        <div class="row"><label style="flex:1">Username<input name="user" value="${esc(m?.user ?? "")}" autocomplete="off"></label>
+          <label style="flex:1">Password<input name="pass" type="password" placeholder="${m?.hasPassword ? "unchanged" : ""}" autocomplete="new-password"></label></div>
+        <div class="row"><label style="flex:1">Send as<input name="from" value="${esc(m?.from ?? "")}" placeholder="My App &lt;hello@yourdomain.com&gt;"></label>
+          <label style="flex:1">Send a test to<input name="testTo" type="email" placeholder="you@example.com" required></label></div>
+        <p class="note">We send a test email first and only save if it arrives. Port 587 works almost everywhere; some hosts (like Hetzner) block 25 and 465.</p>
+        <div class="row" style="justify-content:flex-end"><button class="btn primary">Send test &amp; save</button></div>
+      </form>
+    </div>
+    <div id="vars"></div>`;
+
+  const f = box.querySelector("form");
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = f.querySelector(".primary"); btn.disabled = true; btn.textContent = "Sending test…";
+    try {
+      await api(`${base}/email`, { method: "PUT", body: Object.fromEntries(new FormData(f)) });
+      toast("Test sent and saved. The app restarted.");
+      dispatchEvent(new HashChangeEvent("hashchange"));
+    } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Send test & save"; }
+  };
+  if (!m) return;
+
+  // Connected: show what the app got, and a way to remove it.
+  const vars = Object.fromEntries((await api(`${base}/env`)).map((v) => [v.key, v.value]));
+  box.querySelector("#vars").innerHTML = `
+    <div class="card pad" style="margin-top:14px">
       <dl class="info">
         ${field("SMTP_URL", vars.SMTP_URL, { secret: true })}
         ${field("SMTP_HOST", vars.SMTP_HOST)}
         ${field("SMTP_PORT", vars.SMTP_PORT)}
         ${field("SMTP_FROM", vars.SMTP_FROM)}
       </dl>
-      <p class="muted" style="font-size:13px;margin-top:12px">Your app already has these, plus <code>SMTP_USER</code>, <code>SMTP_PASS</code> and <code>SMTP_SECURE</code>.
-        Send from <code>SMTP_FROM</code>. The provider is shared by all apps: change it in <a href="#/settings">Settings</a>.</p>
+      <p class="muted" style="font-size:13px;margin-top:12px">Your app already has these, plus <code>SMTP_USER</code>, <code>SMTP_PASS</code> and <code>SMTP_SECURE</code>. Send from <code>SMTP_FROM</code>.</p>
     </div>`;
   wireFields(box);
   removeServiceBox(box, base, app, "email");

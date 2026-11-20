@@ -1,49 +1,102 @@
-// Alerts section of the Settings page: where to send alerts, and which ones.
+// Settings → Alerts: where alerts go (destinations), and which things to alert about.
 import { api, esc, icon, toast } from "../app.js";
 
+// Every kind of destination: name, icon, and a hint on where to find what we ask for.
 const TYPES = {
-  email: { label: "Email", hint: "Any email provider (Gmail, Resend, Mailgun, Postmark…) through SMTP." },
-  discord: { label: "Discord", hint: "Channel settings → Integrations → Webhooks → New Webhook → Copy URL." },
-  slack: { label: "Slack", hint: "Create an Incoming Webhook (api.slack.com/apps → Incoming Webhooks) and copy its URL." },
-  telegram: { label: "Telegram", hint: "Message @BotFather, send /newbot, and copy the token it gives you." },
-  webhook: { label: "Webhook", hint: "We POST JSON { event, title, text, link } to this URL. Good for n8n, Zapier, Make…" },
+  email: { label: "Email", icon: "mail", hint: "Any email provider (Gmail, Resend, Mailgun, Postmark…) through SMTP." },
+  discord: { label: "Discord", icon: "chat", hint: "In Discord: channel settings → Integrations → Webhooks → New Webhook → Copy Webhook URL." },
+  slack: { label: "Slack", icon: "chat", hint: "Create an Incoming Webhook (api.slack.com/apps → Incoming Webhooks) and copy its URL." },
+  telegram: { label: "Telegram", icon: "send", hint: "Message @BotFather in Telegram, send /newbot, and copy the token it gives you." },
+  webhook: { label: "Webhook", icon: "link", hint: "We POST JSON { event, title, text, link } to this URL. Good for n8n, Zapier, Make…" },
 };
 
-export async function alertsSection(el) {
+// The events, grouped, with a short explanation of when each one is sent.
+// The names come from the server; this only adds the grouping and the explanations.
+const GROUPS = [
+  ["Apps", [
+    ["deployFailed", "When a build or start fails. The old version keeps running."],
+    ["appDown", "When an app stops answering for 3 minutes, or keeps restarting."],
+    ["cronFailed", "When a scheduled job still fails after its retries."],
+  ]],
+  ["Server", [
+    ["backupFailed", "When a nightly backup, or its off-server copy, doesn't work."],
+    ["serverProblem", "When Server Doctor finds something: disk filling up, HTTPS, updates…"],
+  ]],
+  ["Good news", [
+    ["resolved", "When one of the problems above is fixed again."],
+  ]],
+];
+
+export async function alertsPage(view) {
   const d = await api("/api/alerts");
-  el.innerHTML = `
-    <div class="row spread"><b>Alerts</b><button class="btn" id="addch">${icon("plus")} Add destination</button></div>
-    <p class="muted" style="margin:2px 0 10px">Get told when something goes wrong, without opening this dashboard.</p>
-    <div id="chform"></div>
-    <div class="card list">${d.channels.map((c) => `
-      <div>
-        <span class="badge">${esc(TYPES[c.type]?.label ?? c.type)}</span>
-        <span class="grow"><b>${esc(c.name)}</b> <span class="muted">${esc(c.label)}</span></span>
-        <button class="btn" data-test="${c.id}">Send test</button>
-        <button class="btn danger" data-del="${c.id}">${icon("trash")}</button>
-      </div>`).join("") || `<div class="muted">No destinations yet. Alerts aren't sent anywhere.</div>`}
+  view.innerHTML = `
+    <div class="head"><h1>Alerts</h1>
+      <p class="muted">Get told when something goes wrong, without keeping this dashboard open.</p></div>
+
+    <div class="card setcard">
+      <div class="sethead pad">
+        <span class="tile">${icon("send")}</span>
+        <div class="grow"><b>Where alerts go</b>
+          <p class="muted">Every alert goes to all of these.</p></div>
+        <button class="btn primary" id="add">${icon("plus")} Add destination</button>
+      </div>
+      <div id="form"></div>
+      <div class="list">${d.channels.map(destinationRow).join("")
+        || `<div class="muted">No destinations yet, so alerts aren't sent anywhere. Add one to start.</div>`}</div>
     </div>
-    <div class="events">${Object.entries(d.eventNames).map(([k, label]) => `
-      <label class="check"><input type="checkbox" data-ev="${k}" ${d.events[k] ? "checked" : ""}> ${esc(label)}</label>`).join("")}
+
+    <div class="card setcard" style="margin-top:14px">
+      <div class="sethead pad">
+        <span class="tile">${icon("alert")}</span>
+        <div class="grow"><b>What to alert about</b>
+          <p class="muted">Turn off what you don't want to hear about. Changes save right away.</p></div>
+      </div>
+      ${GROUPS.map(([group, events]) => `
+        <div class="evgroup">${esc(group)}</div>
+        <div class="list">${events.map(([key, why]) => `
+          <label class="evrow">
+            <span class="grow"><b>${esc(d.eventNames[key] ?? key)}</b><span class="note">${esc(why)}</span></span>
+            <span class="switch"><input type="checkbox" data-ev="${key}" ${d.events[key] ? "checked" : ""}><span></span></span>
+          </label>`).join("")}</div>`).join("")}
     </div>`;
 
-  el.querySelector("#addch").onclick = () => form(el.querySelector("#chform"), () => alertsSection(el));
-  el.querySelectorAll("[data-test]").forEach((b) => (b.onclick = async () => {
-    b.disabled = true;
+  view.querySelector("#add").onclick = () => addForm(view.querySelector("#form"), () => alertsPage(view));
+
+  view.querySelectorAll("[data-test]").forEach((b) => (b.onclick = async () => {
+    b.disabled = true; b.textContent = "Sending…";
     try { await api(`/api/alerts/channels/${b.dataset.test}/test`, { method: "POST" }); toast("Test sent"); }
     catch (err) { toast(err.message); }
-    b.disabled = false;
+    b.disabled = false; b.textContent = "Send test";
   }));
-  el.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
-    if (!confirm("Remove this destination?")) return;
-    await api(`/api/alerts/channels/${b.dataset.del}`, { method: "DELETE" }); toast("Removed"); alertsSection(el);
+
+  view.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
+    if (!confirm("Remove this destination? Alerts stop going there.")) return;
+    await api(`/api/alerts/channels/${b.dataset.del}`, { method: "DELETE" });
+    toast("Removed");
+    alertsPage(view);
   }));
-  el.querySelectorAll("[data-ev]").forEach((cb) => (cb.onchange = async () => {
-    await api("/api/alerts/events", { method: "PUT", body: { [cb.dataset.ev]: cb.checked } }).catch((err) => toast(err.message));
+
+  view.querySelectorAll("[data-ev]").forEach((cb) => (cb.onchange = async () => {
+    try {
+      await api("/api/alerts/events", { method: "PUT", body: { [cb.dataset.ev]: cb.checked } });
+      toast(cb.checked ? "Turned on" : "Turned off");
+    } catch (err) { toast(err.message); cb.checked = !cb.checked; }
   }));
 }
 
-function form(box, done) {
+function destinationRow(c) {
+  const t = TYPES[c.type] ?? { label: c.type, icon: "link" };
+  return `
+    <div>
+      <span class="tile sm">${icon(t.icon)}</span>
+      <span class="grow"><b>${esc(c.name)}</b><div class="note">${esc(t.label)} · ${esc(c.label)}</div></span>
+      <button class="btn" data-test="${c.id}">Send test</button>
+      <button class="btn danger" data-del="${c.id}" title="Remove">${icon("trash")}</button>
+    </div>`;
+}
+
+// The "Add destination" form. Pick a type, fill in its fields, and we save it only if a test gets through.
+function addForm(box, done) {
   let type = "email";
   const fields = {
     email: `
@@ -60,19 +113,22 @@ function form(box, done) {
     telegram: `
       <label>Bot token<input name="token" placeholder="123456789:ABC…" required autocomplete="off"></label>
       <p class="note">Now open your new bot in Telegram and send it any message. Then:</p>
-      <div class="row"><button type="button" class="btn" id="findchat">Find my chat</button><input name="chatId" placeholder="chat id" style="flex:1" required></div>`,
+      <div class="row" style="flex-wrap:nowrap"><button type="button" class="btn" id="findchat">Find my chat</button>
+        <input name="chatId" placeholder="chat id" required></div>`,
   };
 
   const draw = () => {
     box.innerHTML = `
-      <form class="card pad form" style="margin-bottom:12px;background:var(--bg)">
-        <div class="row" style="gap:6px">${Object.entries(TYPES).map(([k, t]) =>
-          `<button type="button" class="btn ${k === type ? "primary" : ""}" data-type="${k}">${t.label}</button>`).join("")}</div>
+      <form class="form inset">
+        <div class="typepick">${Object.entries(TYPES).map(([k, t]) => `
+          <button type="button" class="choice ${k === type ? "on" : ""}" data-type="${k}">${icon(t.icon)}<b>${t.label}</b></button>`).join("")}</div>
         <p class="note">${TYPES[type].hint}</p>
         <label>Name<input name="name" value="${esc(TYPES[type].label)}" maxlength="40"></label>
         ${fields[type]}
-        <div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-x>Cancel</button>
-          <button class="btn primary">Send test &amp; save</button></div>
+        <div class="row" style="justify-content:flex-end">
+          <button type="button" class="btn" data-x>Cancel</button>
+          <button class="btn primary">Send test &amp; save</button>
+        </div>
       </form>`;
     const f = box.querySelector("form");
     box.querySelectorAll("[data-type]").forEach((b) => (b.onclick = () => { type = b.dataset.type; draw(); }));
@@ -80,7 +136,8 @@ function form(box, done) {
     box.querySelector("#findchat")?.addEventListener("click", async () => {
       try {
         const r = await api("/api/alerts/telegram/find-chat", { method: "POST", body: { token: f.token.value } });
-        f.chatId.value = r.chatId; toast(`Found: ${r.name || r.chatId}`);
+        f.chatId.value = r.chatId;
+        toast(`Found: ${r.name || r.chatId}`);
       } catch (err) { toast(err.message); }
     });
     f.onsubmit = async (e) => {
@@ -88,7 +145,8 @@ function form(box, done) {
       const btn = f.querySelector(".primary"); btn.disabled = true; btn.textContent = "Sending test…";
       try {
         await api("/api/alerts/channels", { method: "POST", body: { type, ...Object.fromEntries(new FormData(f)) } });
-        toast("Test sent and saved"); box.innerHTML = ""; done();
+        toast("Test sent and saved");
+        done();
       } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Send test & save"; }
     };
   };

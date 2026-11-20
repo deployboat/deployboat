@@ -2,7 +2,7 @@
 import { loginScreen } from "./screens/login.js";
 import { appsScreen } from "./screens/apps.js";
 import { appScreen, SECTIONS } from "./screens/app.js";
-import { settingsScreen } from "./screens/settings.js";
+import { settingsScreen, SETTINGS } from "./screens/settings.js";
 import { serverScreen } from "./screens/server.js";
 import { doctorScreen } from "./screens/doctor.js";
 import { processesScreen } from "./screens/processes.js";
@@ -95,6 +95,9 @@ const paths = {
   info: "M12 21a9 9 0 100-18 9 9 0 000 18zM12 11v5M12 8h.01",
   sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17v4M17 19h4",
   git: "M6 3.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM6 15.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM18 6.5a2.5 2.5 0 110 5 2.5 2.5 0 010-5zM6 8.5v7M18 11.5c0 4-6 3-10 5",
+  chat: "M21 12a8 8 0 01-11.6 7.1L3 21l1.9-6.4A8 8 0 1121 12z",
+  send: "M22 2L11 13M22 2l-7 20-4-9-9-4z",
+  link: "M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1",
   gear: "M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM12 15a3 3 0 100-6 3 3 0 000 6z",
 };
 export const icon = (n) => `<svg class="i" viewBox="0 0 24 24"><path d="${paths[n]}"/></svg>`;
@@ -128,6 +131,11 @@ function drawNav(page, appName, section) {
       ${SECTIONS.map(([id, label, ic, soon]) => soon
         ? `<span class="soon">${icon(ic)}${label}<em>Soon</em></span>`
         : link(`${base}/${id}`, ic, label, id === section)).join("")}`;
+  } else if (page === "settings") {
+    nav.innerHTML = `
+      <a href="#/" class="back">${icon("back")}All apps</a>
+      <div class="navtitle">Settings</div>
+      ${SETTINGS.map(([id, label, ic]) => link(`#/settings/${id}`, ic, label, id === (appName || "security"))).join("")}`;
   } else {
     nav.innerHTML = `
       ${link("#/", "box", "Apps", !["settings", "system", "doctor", "backups"].includes(page))}
@@ -164,7 +172,7 @@ async function render() {
 
   try {
     let stop;
-    if (page === "settings") stop = await settingsScreen(box);
+    if (page === "settings") stop = await settingsScreen(box, name);
     else if (page === "system" && name) stop = await processesScreen(box, name);
     else if (page === "system") stop = await serverScreen(box);
     else if (page === "doctor") stop = await doctorScreen(box);

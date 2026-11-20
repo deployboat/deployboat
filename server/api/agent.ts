@@ -16,7 +16,8 @@ const RULES = `How apps must be written for Deploy Boat:
   - File storage (S3-compatible): services ["storage"], or --with storage.
     The app gets S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY.
     Set forcePathStyle: true in the S3 client. Files are public at S3_PUBLIC_URL + "/" + key.
-  - Email: services ["email"], or --with email. The app gets SMTP_URL (and SMTP_HOST,
+  - Email: a person connects the app's email provider once in the dashboard (app → Email).
+    After that, services ["email"] / --with email works. The app gets SMTP_URL (and SMTP_HOST,
     SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SECURE). Use SMTP_FROM as the sender.
 - Don't use external database or storage services, and never hard-code secrets.
   If the app needs an API key, ask the user for it and save it as a variable

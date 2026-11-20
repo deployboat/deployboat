@@ -353,3 +353,30 @@ details.guide summary { cursor: pointer; }
   .dnsrec > div { border-right: 0; border-bottom: 1px solid var(--line); }
   .dnsrec > div:last-child { border-bottom: 0; }
 }
+
+/* settings pages */
+.head p.muted { margin-top: 2px; }
+.setcard { overflow: hidden; }
+.sethead { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+.sethead.pad { margin-bottom: 0; border-bottom: 1px solid var(--line); }
+.sethead p.muted { font-size: 13.5px; margin-top: 2px; }
+.sethead .btn { flex-shrink: 0; }
+.setfoot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.tile { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: var(--accent); background: var(--soft); flex-shrink: 0; }
+.tile.sm { width: 30px; height: 30px; border-radius: 8px; }
+.tile.sm svg.i { width: 16px; height: 16px; }
+.inset { padding: 16px 18px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.typepick { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.typepick .choice { justify-items: center; text-align: center; padding: 10px 6px; font-size: 13px; }
+.typepick .choice svg.i { margin: 0; }
+.evgroup { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; padding: 14px 18px 6px; }
+.evrow { cursor: pointer; }
+.evrow .grow { display: grid; gap: 1px; white-space: normal; }
+.evrow b { font-weight: 500; }
+.evrow:hover { background: var(--bg); }
+.list .muted { padding: 16px 18px; }
+@media (max-width: 600px) {
+  .typepick { grid-template-columns: repeat(3, 1fr); }
+  .sethead { flex-wrap: wrap; }
+  .sethead .grow { min-width: 200px; }
+}
