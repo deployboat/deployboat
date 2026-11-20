@@ -448,3 +448,7 @@ details.guide summary { cursor: pointer; }
 .verup { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-weight: 600; }
 .verup svg.i { width: 13px; height: 13px; }
 @media (max-width: 760px) { .ver { display: none !important; } }
+
+/* settings tabs */
+.tabs svg.i { width: 16px; height: 16px; }
+.tabintro { margin: -4px 0 14px; }

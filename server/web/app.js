@@ -2,7 +2,7 @@
 import { loginScreen } from "./screens/login.js";
 import { appsScreen } from "./screens/apps.js";
 import { appScreen, SECTIONS } from "./screens/app.js";
-import { settingsScreen, SETTINGS } from "./screens/settings.js";
+import { settingsScreen } from "./screens/settings.js";
 import { serverScreen } from "./screens/server.js";
 import { doctorScreen } from "./screens/doctor.js";
 import { processesScreen } from "./screens/processes.js";
@@ -135,11 +135,6 @@ function drawNav(page, appName, section) {
       ${SECTIONS.map(([id, label, ic, soon]) => soon
         ? `<span class="soon">${icon(ic)}${label}<em>Soon</em></span>`
         : link(`${base}/${id}`, ic, label, id === section)).join("")}`;
-  } else if (page === "settings") {
-    nav.innerHTML = `
-      <a href="#/" class="back">${icon("back")}All apps</a>
-      <div class="navtitle">Settings</div>
-      ${SETTINGS.map(([id, label, ic]) => link(`#/settings/${id}`, ic, label, id === (appName || "security"))).join("")}`;
   } else {
     nav.innerHTML = `
       ${link("#/", "box", "Apps", !["settings", "system", "doctor", "backups"].includes(page))}

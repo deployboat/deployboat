@@ -4,8 +4,7 @@ import { dnsHelp, recordBox, wireCopy } from "./dns.js";
 
 export async function domainPage(view) {
   view.innerHTML = `
-    <div class="head"><h1>Domain</h1>
-      <p class="muted">Give every app an address under a domain you own, like <code>blog.example.com</code>.</p></div>
+    <p class="muted tabintro">Give every app an address under a domain you own, like <code>blog.example.com</code>.</p>
     <div class="card pad" id="domain"></div>`;
   await domainSection(view.querySelector("#domain"));
 }

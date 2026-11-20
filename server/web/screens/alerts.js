@@ -30,8 +30,7 @@ const GROUPS = [
 export async function alertsPage(view) {
   const d = await api("/api/alerts");
   view.innerHTML = `
-    <div class="head"><h1>Alerts</h1>
-      <p class="muted">Get told when something goes wrong, without keeping this dashboard open.</p></div>
+    <p class="muted tabintro">Get told when something goes wrong, without keeping this dashboard open.</p>
 
     <div class="card setcard">
       <div class="sethead pad">

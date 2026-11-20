@@ -4,8 +4,7 @@ import { api, esc, icon, copy, toast, timeAgo } from "../app.js";
 export async function securityPage(view) {
   const s = await api("/api/settings");
   view.innerHTML = `
-    <div class="head"><h1>Security</h1>
-      <p class="muted">Who can use this server: you with the main token, and your tools with agent tokens.</p></div>
+    <p class="muted tabintro">Who can use this server: you with the main token, and your tools with agent tokens.</p>
 
     <div class="card pad setcard">
       <div class="sethead">
