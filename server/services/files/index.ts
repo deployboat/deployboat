@@ -137,7 +137,10 @@ export async function rename(oldApp: string, newApp: string) {
 
 // An S3 client for the app's own bucket, from this server (the host can reach the container directly).
 export async function clientFor(app: string): Promise<s3.S3> {
-  const ip = await run("docker", ["inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", CONTAINER]);
+  // Its address on the shared service network. (It's on each storage app's network too;
+  // asking for "all networks" would glue several addresses together.)
+  const ip = await run("docker", ["inspect", "-f", `{{(index .NetworkSettings.Networks "${config.dockerNetwork}").IPAddress}}`, CONTAINER]);
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) throw new Error("The file storage server isn't running. Restart it on the System page.");
   const env = getEnv(app);
   return { endpoint: `http://${ip}:3900`, region: "garage", bucket: env.S3_BUCKET, accessKey: env.S3_ACCESS_KEY, secretKey: env.S3_SECRET_KEY };
 }

@@ -24,6 +24,7 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 - **A clearer Variables page.** Your variables in a table with show/hide, copy, inline edit (rename too) and delete, plus search. Paste a whole .env file (with a preview of what's new or replaced) or download one. Names are cleaned up as you type, and several changes restart the app only once. Deploy Boat's own variables are grouped and folded away.
 - **Select boxes in the dashboard's own style** everywhere, with search for long lists like time zones. Fixed misaligned fields on the Crons form, and menus that closed by themselves on the Logs page while the log was updating.
 - **Our own dialogs instead of the browser's.** Every confirm and name prompt is now a dialog in the dashboard's style, with a clear title, an explanation and a labelled button (red for destructive ones). Deleting an app, a database or storage, or restoring a backup asks you to type the app's name, and the button unlocks when it matches. Messages at the bottom now show a check or, for errors, a red warning that stays longer and can be closed.
+- Fixed: "Invalid URL" on the Storage page, and failing backups, deletes and restores of stored files, once an app had storage (the storage server's address was read wrong).
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0
