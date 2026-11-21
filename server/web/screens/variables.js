@@ -42,6 +42,7 @@ export async function variablesPage(box, base, app) {
   let vars = [];
   let editing = null;          // the key being edited
   const shown = new Set();     // keys whose value is visible
+  let builtinOpen = false;     // is "Set by Deploy Boat" unfolded (kept across redraws)
 
   box.innerHTML = `
     <div class="varbar">
@@ -85,7 +86,7 @@ export async function variablesPage(box, base, app) {
 
     // Deploy Boat's own, folded, grouped by where they come from.
     box.querySelector("#builtin").innerHTML = builtin.length ? `
-      <details class="card vardetails" ${q ? "open" : ""}>
+      <details class="card vardetails" ${q || builtinOpen ? "open" : ""}>
         <summary><span class="chev">${icon("chevron")}</span>${icon("lock")}<b>Set by Deploy Boat</b>
           <span class="note">${builtin.length} · from this app's services, can't be edited here</span></summary>
         <div class="vargrid">${BUILTIN_GROUPS.map(([label, re, why]) => {
@@ -121,6 +122,7 @@ export async function variablesPage(box, base, app) {
   }
 
   function wire() {
+    box.querySelector(".vardetails")?.addEventListener("toggle", (e) => (builtinOpen = e.target.open));
     box.querySelectorAll("[data-a]").forEach((b) => (b.onclick = () => act(b.dataset.a, b.dataset.key)));
     const f = box.querySelector("[data-form]");
     if (!f) return;
