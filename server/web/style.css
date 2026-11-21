@@ -644,3 +644,19 @@ a.domhost:hover { color: var(--accent); }
 .fb-list.busy { opacity: .45; pointer-events: none; }
 .fb-list.busy::after { content: ""; position: absolute; top: 40px; left: 50%; width: 18px; height: 18px; margin-left: -9px;
   border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+
+/* App page header: where you are on the left, the app's state and actions on the right */
+.apphead { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin: 12px 0 22px; }
+.apphead-title { min-width: 0; }
+.apphead h1 { line-height: 1.2; margin: 2px 0; }
+.crumb { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
+.crumb a { color: var(--muted); text-decoration: none; } .crumb a:hover { color: var(--ink); }
+.crumb svg.i { width: 13px; height: 13px; opacity: .6; }
+.crumb span { color: var(--ink); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apphead-url { font-size: 13px; color: var(--muted); text-decoration: none; }
+.apphead-url:hover { color: var(--accent); }
+.apphead-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.statchip { display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); cursor: default; }
+.statchip.live { --c: var(--ok); } .statchip.stopped { --c: var(--muted); } .statchip.failed { --c: var(--bad); } .statchip.building { --c: var(--warn); }
+.statchip .status { gap: 0; }

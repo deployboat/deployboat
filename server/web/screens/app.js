@@ -28,16 +28,22 @@ export async function appScreen(view, name, section) {
   const app = await api(`/api/apps/${encodeURIComponent(name)}`);
   const s = statusOf(app);
   const title = SECTIONS.find(([id]) => id === section)?.[1] ?? "Overview";
+  const host = app.url.replace(/^https:\/\//, "");
+  const label = { live: "Live", stopped: "Stopped", failed: "Failed", building: "Building" }[s] ?? s;
   view.innerHTML = `
-    <div class="row spread head">
-      <div><div class="muted" style="font-size:13px">${esc(app.displayName)}</div>
-        <div class="row"><h1>${title}</h1><span class="status ${s}">${s}</span></div></div>
-      <div class="row" style="gap:8px">
+    <div class="apphead">
+      <div class="apphead-title">
+        <nav class="crumb"><a href="#/">Apps</a>${icon("chevron")}<span>${esc(app.displayName)}</span></nav>
+        <h1>${title}</h1>
+        <a class="apphead-url" href="${esc(app.url)}" target="_blank">${esc(host)}</a>
+      </div>
+      <div class="apphead-actions">
+        <span class="statchip ${s}" title="Last deploy ${timeAgo(app.deploys[0]?.created_at)}"><span class="status ${s}"></span>${label}</span>
         <a class="btn" href="${esc(app.url)}" target="_blank">${icon("external")} Open site</a>
+        <button class="btn" id="restart" ${app.stopped ? "disabled" : ""} title="Restart the app">${icon("restart")} Restart</button>
         ${app.stopped
           ? `<button class="btn primary" id="toggle">${icon("play")} Start</button>`
-          : `<button class="btn" id="toggle">${icon("stop")} Stop</button>`}
-        <button class="btn" id="restart" ${app.stopped ? "disabled" : ""}>${icon("restart")} Restart</button>
+          : `<button class="btn" id="toggle" title="Stop the app; the site goes offline">${icon("stop")} Stop</button>`}
       </div>
     </div>
     <div id="section"></div>`;
