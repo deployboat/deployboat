@@ -1,6 +1,6 @@
 // One app. The sidebar picks the section; each section is a small function below.
 import { api, esc, timeAgo, statusOf, icon, toast, copy } from "../app.js";
-import { share } from "./share.js";
+import { shareCard } from "./share.js";
 import { crons } from "./crons.js";
 import { lineChart, uptimeStrip } from "../chart.js";
 import { rangePicker } from "./ranges.js";
@@ -17,7 +17,6 @@ export const SECTIONS = [
   ["email", "Email", "mail"],
   ["database", "Database", "db"],
   ["files", "Files", "file"],
-  ["share", "Share", "share"],
   ["crons", "Crons", "clock"],
   ["versions", "Versions", "history"],
   ["logs", "Logs", "term"],
@@ -48,7 +47,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs: logsPage, variables, database, files: filesPage, storage, email, domains, share, crons, settings }[section] ?? overview;
+  const show = { overview, versions, logs: logsPage, variables, database, files: filesPage, storage, email, domains, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -92,6 +91,7 @@ function overview(box, base, app) {
   box.innerHTML = `
     ${app.previewOf ? `<div class="card pad banner">${icon("git")} Preview of <a href="#/apps/${encodeURIComponent(app.previewOf)}">${esc(app.previewOf)}</a> for pull request #${app.pr}.
       It's deleted, with its data, when the pull request is closed or merged.</div>` : ""}
+    <div class="ovtop">
     <div class="card pad">
       <dl class="info">
         <dt>Address</dt><dd><a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></dd>
@@ -103,6 +103,8 @@ function overview(box, base, app) {
         ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
       </dl>
     </div>
+    <div class="card pad sharecard" id="share"></div>
+    </div>
     ${app.git ? `<div class="row" style="margin-top:14px"><button class="btn primary" id="redeploy">${icon("git")} Pull &amp; redeploy</button></div>` : ""}
     ${app.git && !app.git.isPreview ? autoDeployCard(app.git) : ""}`;
 
@@ -110,6 +112,7 @@ function overview(box, base, app) {
   box.append(mon);
   box.stop = monitoring(mon, app);
   persistentFolders(box.querySelector("#folders"), base, app);
+  shareCard(box.querySelector("#share"), base).catch(() => {});
   wireAutoDeploy(box, base, app);
   box.querySelector("#redeploy")?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;
