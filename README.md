@@ -100,7 +100,7 @@ Python, Go, PHP and more. If you already have a Dockerfile, it uses that.
 No extra accounts, no extra bills. Add what an app needs with one click, or let your AI agent add it.
 
 - **Persistent storage that survives deploys**: `/data` (also in `DATA_DIR`) for SQLite files, uploads and anything else your app saves, plus any extra folders you add
-- **A file browser** for those folders: look inside, edit text files, upload, download
+- **A file browser with a code editor**: see every file inside your app, edit, upload and download
 - **PostgreSQL database**, ready as `DATABASE_URL`
 - **File storage** (S3-compatible) with public links, for uploads and images
 - **Email sending** through your provider, ready as `SMTP_URL`

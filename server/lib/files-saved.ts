@@ -1,14 +1,14 @@
-// The file browser behind the app's Files page.
+// Files page, when the app isn't running: only its persistent folders, read straight from
+// the server's disk (see appdata.ts). When it runs, files-container.ts is used instead.
 //
-// It shows the app's persistent folders (see appdata.ts): /data and any extra ones.
 // Paths are the ones the app sees, like "/data/uploads/a.png". We turn them into a path
 // on the server and make sure it stays inside one of the folders, so "../" or a symlink
 // can't reach anything else on the server.
-import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
-import { dirname, join, relative, basename } from "node:path";
+import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, readFileSync, writeFileSync, chmodSync, renameSync, createReadStream } from "node:fs";
+import { Readable } from "node:stream";
+import type { Entry } from "./files-container.ts";
+import { dirname, join, relative } from "node:path";
 import { mounts } from "./appdata.ts";
-
-const MAX_EDIT = 1024 * 1024; // files bigger than 1 MB can be downloaded, not edited here
 
 // "/data/a/b.txt" → its path on the server. Throws if it's outside the app's folders.
 export function resolveFile(app: string, path: string) {
@@ -27,28 +27,24 @@ export function resolveFile(app: string, path: string) {
   return { full, clean, isRoot: clean === inside };
 }
 
-export type Entry = { name: string; dir: boolean; size: number; modified: string };
-
 export function listFolder(app: string, path: string): Entry[] {
   const { full } = resolveFile(app, path);
   if (!existsSync(full) || !statSync(full).isDirectory()) throw new Error("Folder not found.");
   return readdirSync(full, { withFileTypes: true })
     .map((d) => {
       const st = statSync(join(full, d.name), { throwIfNoEntry: false });
-      return { name: d.name, dir: !!st?.isDirectory(), size: st?.size ?? 0, modified: st?.mtime.toISOString().replace("T", " ").slice(0, 19) ?? "" /* same format as the database */ };
+      return { name: d.name, dir: !!st?.isDirectory(), link: d.isSymbolicLink(), size: st?.size ?? 0, modified: st?.mtime.toISOString().replace("T", " ").slice(0, 19) ?? "" /* same format as the database */ };
     })
     .sort((a, b) => Number(b.dir) - Number(a.dir) || a.name.localeCompare(b.name));
 }
 
-// A text file's content, or why it can't be shown.
-export function readText(app: string, path: string) {
+// The file's bytes. Throws "too big" past `max` bytes.
+export function readFile(app: string, path: string, max: number) {
   const { full } = resolveFile(app, path);
   const st = statSync(full, { throwIfNoEntry: false });
   if (!st?.isFile()) throw new Error("File not found.");
-  if (st.size > MAX_EDIT) return { text: null, reason: "This file is bigger than 1 MB. Download it instead." };
-  const buf = readFileSync(full);
-  if (buf.includes(0)) return { text: null, reason: "This isn't a text file. Download it instead." };
-  return { text: buf.toString("utf8"), reason: null };
+  if (st.size > max) throw new Error("too big");
+  return readFileSync(full);
 }
 
 export function writeFile(app: string, path: string, data: string | Uint8Array) {
@@ -69,13 +65,20 @@ export function makeFolder(app: string, path: string) {
 
 export function removeFile(app: string, path: string) {
   const { full, isRoot } = resolveFile(app, path);
-  if (isRoot) throw new Error("The folder itself can't be deleted. Remove it from Persistent storage instead.");
+  if (isRoot) throw new Error("The folder itself can't be deleted. Remove it from Persistent storage on the Overview instead.");
   rmSync(full, { recursive: true, force: true });
 }
 
-// For downloads: the server path and a file name.
-export function fileForDownload(app: string, path: string) {
+export function renameFile(app: string, from: string, to: string) {
+  const a = resolveFile(app, from), b = resolveFile(app, to);
+  if (a.isRoot || b.isRoot) throw new Error("A persistent folder itself can't be renamed.");
+  if (existsSync(b.full)) throw new Error("Something with that name is already there.");
+  renameSync(a.full, b.full);
+}
+
+// For downloads: the file as a stream.
+export function streamFile(app: string, path: string) {
   const { full } = resolveFile(app, path);
   if (!statSync(full, { throwIfNoEntry: false })?.isFile()) throw new Error("File not found.");
-  return { full, name: basename(full) };
+  return Readable.toWeb(createReadStream(full)) as ReadableStream;
 }

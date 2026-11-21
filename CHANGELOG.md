@@ -9,7 +9,7 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 ## Unreleased
 
 - **Persistent storage on the app's Overview.** `/data` is always kept; click the edit button to add more folders (like `/app/uploads`). They survive deploys and are backed up too. Replaces the Data folder page.
-- **Files page for every app.** Browse its persistent folders, open and edit text files, upload, download, make folders and delete.
+- **Files page for every app.** Browse everything inside the running app, edit files in a code editor (syntax colors, line numbers, Ctrl+S), and upload (drag and drop), download, rename and delete. Each folder shows whether it's kept across deploys. When the app is stopped, its persistent folders are still there.
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0
