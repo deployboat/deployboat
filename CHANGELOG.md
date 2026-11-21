@@ -15,6 +15,9 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 - **Domains in one table.** The free address is a row like any other: edit it (renames the app) or turn it off once the app has a domain of its own. Your domains can be renamed or removed too. Each row shows its status, with step-by-step DNS help, a countdown to the next check, Check now, and "also add www" when adding.
 - **A file browser on the Storage page.** Browse folders, upload (drag and drop works), copy a file's public link, open, and delete files or whole folders, with image previews. Code examples for Node.js and Python, and the connection details tucked away.
 - Fixed: files restored from a backup into storage lost their type, so images downloaded instead of showing. They now get the right type from their name.
+- **Removed: email for apps.** Apps send email with their own provider (Resend, Postmark…), using an API key saved as a variable. Apps that already had email keep their `SMTP_*` variables, now as normal variables you can change or delete. Alert emails (Settings → Alerts) still work.
+- **Pick your database: PostgreSQL, MySQL (MariaDB) or SQLite.** The Database page explains each one. Also from the CLI (`deployboat add mysql`, `--with sqlite`) and for AI agents.
+- **A database viewer.** Browse tables page by page, see their structure, and run any SQL (with a check before changes), with results you can download as CSV. It runs as the app's own database user, so it can't touch other apps.
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0

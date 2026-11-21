@@ -1,14 +1,14 @@
 // Each app gets its own Docker network, so apps can't reach each other.
 //
-//   app-shop-net:  app-shop  +  caddy  (+ postgres if shop has a database)  (+ garage if it has storage)
-//   deployboat:    caddy, postgres, garage   (the shared "service" network)
+//   app-shop-net:  app-shop  +  caddy  (+ postgres or mysql if shop has one)  (+ garage if it has storage)
+//   deployboat:    caddy, postgres, mysql, garage   (the shared "service" network)
 //
 // Service names stay the same inside every network (postgres, garage), so
 // DATABASE_URL and S3_ENDPOINT don't change.
 import { run } from "../lib/shell.ts";
 import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
-import { enabled as hasDatabase } from "../services/postgres/index.ts";
+import { enabled as hasDatabase, engineOf } from "../services/database/index.ts";
 import { enabled as hasStorage } from "../services/files/index.ts";
 
 export const containerName = (app: string) => `app-${app}`;
@@ -22,8 +22,12 @@ export async function prepareNetwork(app: string) {
   const net = appNetwork(app);
   await docker("network", "inspect", net).catch(() => docker("network", "create", "--label", `deployboat.app=${app}`, net));
   await quiet(docker("network", "connect", net, "caddy"));
-  if (hasDatabase(app)) await quiet(docker("network", "connect", net, "postgres"));
-  else await quiet(docker("network", "disconnect", net, "postgres"));
+  // Only the app's own database server (SQLite has none).
+  const dbServer = hasDatabase(app) ? engineOf(app).container : null;
+  for (const server of ["postgres", "mysql"]) {
+    if (server === dbServer) await quiet(docker("network", "connect", net, server));
+    else await quiet(docker("network", "disconnect", net, server));
+  }
   if (hasStorage(app)) await quiet(docker("network", "connect", net, "garage"));
   else await quiet(docker("network", "disconnect", net, "garage"));
   return net;
@@ -31,7 +35,7 @@ export async function prepareNetwork(app: string) {
 
 export async function removeNetwork(app: string) {
   const net = appNetwork(app);
-  for (const c of ["caddy", "postgres", "garage", containerName(app)]) await quiet(docker("network", "disconnect", "-f", net, c));
+  for (const c of ["caddy", "postgres", "mysql", "garage", containerName(app)]) await quiet(docker("network", "disconnect", "-f", net, c));
   await quiet(docker("network", "rm", net));
 }
 

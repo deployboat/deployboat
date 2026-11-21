@@ -13,15 +13,17 @@ const RULES = `How apps must be written for Deploy Boat:
   except in the data folder. Save files, uploads and SQLite databases in the folder in
   the DATA_DIR environment variable (it's /data). Example: path.join(process.env.DATA_DIR, "app.db").
 - No database or file storage by default. Add them only if the app needs them:
-  - PostgreSQL database: deploy with services ["database"] (MCP deploy tool),
-    or: deployboat deploy --with database   (later: deployboat add database).
-    The app then gets DATABASE_URL.
+  - Database: deploy with services ["database"] (MCP deploy tool), or:
+    deployboat deploy --with database   (later: deployboat add database).
+    That's PostgreSQL, the default. The app then gets DATABASE_URL.
+    If the code expects MySQL, use "mysql" instead of "database" (DATABASE_URL is mysql://…).
+    For a small single-copy app, "sqlite" gives a file database: DATABASE_URL=file:/data/app.db
+    and SQLITE_PATH=/data/app.db.
   - File storage (S3-compatible): services ["storage"], or --with storage.
     The app gets S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY.
     Set forcePathStyle: true in the S3 client. Files are public at S3_PUBLIC_URL + "/" + key.
-  - Email: a person connects the app's email provider once in the dashboard (app → Email).
-    After that, services ["email"] / --with email works. The app gets SMTP_URL (and SMTP_HOST,
-    SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_SECURE). Use SMTP_FROM as the sender.
+  - Email: not built in. If the app sends email, use a provider's API or SMTP (Resend,
+    Postmark…) and ask the user for its key; save it as a variable.
 - Don't use external database or storage services, and never hard-code secrets.
   If the app needs an API key, ask the user for it and save it as a variable
   (set_env tool, or: deployboat env set KEY=value).
@@ -44,7 +46,7 @@ Other commands (same --server and --token):
   npx deployboat logs              the app's recent output
   npx deployboat env set KEY=value add a secret or setting (restarts the app)
   npx deployboat status            is it running, and where
-  npx deployboat add database      give the app a PostgreSQL database (or: add storage, add email)
+  npx deployboat add database      give the app a PostgreSQL database (or: add mysql, add sqlite, add storage)
 
 ${RULES}
 `);

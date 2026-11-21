@@ -19,7 +19,7 @@ import { alerts } from "./alerts.ts";
 import { metrics } from "./metrics.ts";
 import { agentPrompt, agentGuide } from "./agent.ts";
 import { resolveName, db } from "../lib/db.ts";
-import { isService } from "../services/index.ts";
+import { parseService } from "../services/index.ts";
 import { serverDomain, saveServerDomain, domainOwner } from "../lib/domains.ts";
 import { checkDns, cleanHost, looksLikeHost } from "../lib/dns.ts";
 import { syncRoutes } from "../deploy/route.ts";
@@ -114,10 +114,10 @@ app.post("/api/deploy/:name", async (c) => {
   if (!c.req.raw.body) return c.json({ error: "No files uploaded." }, 400);
   if (isBusy(name)) return c.json({ error: `${name} is already deploying. Wait for it to finish.` }, 409);
 
-  // ?with=database,storage adds those services on this deploy.
+  // ?with=database,storage adds those services on this deploy. "mysql" or "sqlite" pick the database type.
   const add = (c.req.query("with") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-  const bad = add.find((x) => !isService(x));
-  if (bad) return c.json({ error: `Unknown service "${bad}". Use database, storage or email.` }, 400);
+  const bad = add.find((x) => !parseService(x));
+  if (bad) return c.json({ error: `Unknown service "${bad}". Use database (or postgres, mysql, sqlite) or storage.` }, 400);
 
   lock(name);
   let srcDir: string;
@@ -131,7 +131,7 @@ app.post("/api/deploy/:name", async (c) => {
   c.header("x-app-name", name); // lets the CLI update .deployboat.json after a rename
   return streamText(c, async (out) => {
     try {
-      const url = await deploy(name, srcDir, (line) => out.writeln(line), add as any);
+      const url = await deploy(name, srcDir, (line) => out.writeln(line), add);
       await out.writeln(`LIVE ${url}`);
     } catch (e) {
       await out.writeln(`FAILED ${(e as Error).message}`);

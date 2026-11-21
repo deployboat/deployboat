@@ -2,7 +2,7 @@
 import type { Check } from "../types.ts";
 import { run } from "../../lib/shell.ts";
 
-const SERVICES: Record<string, string> = { caddy: "Web server", buildkit: "App builder", postgres: "Database", garage: "File storage" };
+const SERVICES: Record<string, string> = { caddy: "Web server", buildkit: "App builder", postgres: "Database (PostgreSQL)", mysql: "Database (MySQL)", garage: "File storage" };
 
 // "running", "exited"… or "" when the container doesn't exist (not set up yet).
 const state = (name: string) => run("docker", ["inspect", "-f", "{{.State.Status}}", name]).catch(() => "");

@@ -53,7 +53,7 @@ async function containers() {
   return new Map(out.split("\n").filter(Boolean).map((l) => l.split(" ") as [string, string]));
 }
 
-const LABELS: Record<string, string> = { caddy: "Web server", postgres: "Database", garage: "File storage", buildkit: "App builder" };
+const LABELS: Record<string, string> = { caddy: "Web server", postgres: "Database (PostgreSQL)", mysql: "Database (MySQL)", garage: "File storage", buildkit: "App builder" };
 function owner(cgroup: string, names: Map<string, string>) {
   const id = cgroup.match(/[0-9a-f]{64}/)?.[0];
   if (id && names.has(id)) {

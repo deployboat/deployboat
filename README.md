@@ -64,7 +64,7 @@ Then, in any project, just say *"publish it"*. Your agent gets these tools:
 | Tool | What the agent can do |
 |---|---|
 | `deploy` | Publish or update the project and get the live URL |
-| `add_service` | Give the app a database, file storage or email, only if it needs one |
+| `add_service` | Give the app a database or file storage, only if it needs one |
 | `get_logs` | Read the app's output to debug a crash |
 | `set_env` / `unset_env` | Add API keys and settings without putting them in code |
 | `app_status`, `list_apps` | See what's running and where |
@@ -101,9 +101,8 @@ No extra accounts, no extra bills. Add what an app needs with one click, or let 
 
 - **Persistent storage that survives deploys**: `/data` (also in `DATA_DIR`) for SQLite files, uploads and anything else your app saves, plus any extra folders you add
 - **A file browser with a code editor**: see every file inside your app, edit, upload and download
-- **PostgreSQL database**, ready as `DATABASE_URL`
+- **A database**: PostgreSQL, MySQL or SQLite, ready as `DATABASE_URL`, with a viewer and SQL box in the dashboard
 - **File storage** (S3-compatible) with public links, for uploads and images
-- **Email sending** through your provider, ready as `SMTP_URL`
 - **HTTPS** on a free address, or on **your own domain**
 - **Password protection** and private share links for previews
 - **Cron jobs** that call a URL or run a command on a schedule, with retries

@@ -5,6 +5,7 @@ import { db } from "../lib/db.ts";
 import { getEnv, setEnv, isBuiltin } from "../lib/env.ts";
 import { getGit, queueDeploy } from "./git.ts";
 import { enabledServices, addService, removeAllServices } from "../services/index.ts";
+import { typeOf } from "../services/database/index.ts";
 import { remove } from "./manage.ts";
 
 export const previewName = (app: string, pr: number) => {
@@ -24,7 +25,7 @@ export async function deployPreview(app: string, pr: number, ref: string, reason
       VALUES (?, ?, ?, ?, ?, ?, 0, 0)`).run(name, main.repo, main.branch, main.private_key, main.public_key, ref);
     // The main app's own variables (API keys, settings), but not its database or storage.
     for (const [k, v] of Object.entries(getEnv(app))) if (!isBuiltin(k)) setEnv(name, k, v);
-    for (const s of enabledServices(app)) await addService(name, s);
+    for (const s of enabledServices(app)) await addService(name, s, () => {}, s === "database" ? typeOf(app) : undefined); // same database type as the app
   }
   return queueDeploy(name, reason);
 }

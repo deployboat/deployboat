@@ -65,7 +65,7 @@ export async function serverScreen(page) {
 // Plain-language name for each container.
 function label(name) {
   if (name.startsWith("app-")) return "Your app";
-  return { caddy: "Web server & HTTPS", postgres: "Database", garage: "File storage", buildkit: "App builder" }[name] ?? "";
+  return { caddy: "Web server & HTTPS", postgres: "Database (PostgreSQL)", mysql: "Database (MySQL)", garage: "File storage", buildkit: "App builder" }[name] ?? "";
 }
 
 // A usage card. With `href`, it links to a detail page.

@@ -2,7 +2,7 @@
 import { config } from "../lib/config.ts";
 import { db } from "../lib/db.ts";
 import { build } from "./build.ts";
-import { provisionServices, addService, type ServiceName } from "../services/index.ts";
+import { provisionServices, addService, parseService } from "../services/index.ts";
 import { start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
 import { notify } from "../alerts/index.ts";
@@ -17,7 +17,7 @@ export async function deploy(
   name: string,
   source: string | ((log: (l: string) => void) => Promise<string>),
   log: (l: string) => void = () => {},
-  add: ServiceName[] = [],   // services to add on this deploy, e.g. ["database"]
+  add: string[] = [],   // services to add on this deploy, e.g. ["database"], ["mysql", "storage"]
 ): Promise<string> {
   db.prepare("INSERT OR IGNORE INTO apps (name) VALUES (?)").run(name);
   const { lastInsertRowid: id } = db.prepare("INSERT INTO deploys (app, status) VALUES (?, 'building')").run(name);
@@ -33,7 +33,10 @@ export async function deploy(
     const srcDir = typeof source === "string" ? source : await source(logAndSave);
     const image = await build(name, srcDir, logAndSave);
     db.prepare("UPDATE deploys SET image = ? WHERE id = ?").run(image, id);
-    for (const s of add) await addService(name, s, logAndSave);
+    for (const s of add) {
+      const p = parseService(s);
+      if (p) await addService(name, p.service, logAndSave, p.type);
+    }
     await provisionServices(name, logAndSave);
     await start(name, image, logAndSave);
     await syncRoutes().catch(() => {

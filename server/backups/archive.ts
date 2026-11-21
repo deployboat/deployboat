@@ -2,38 +2,20 @@
 //
 //   <app>-<date>.tar.gz
 //     meta.json        what's inside, when, which app
-//     database.dump    pg_dump of the app's database (if it has one)
+//     database.dump    pg_dump of the app's PostgreSQL database (if it has one)
+//     database.sql     or a mysqldump of its MySQL database. SQLite is a file in data/.
 //     storage/…        every file in the app's storage bucket (if it has one)
 //     data/…           the app's /data folder (DATA_DIR)
 //     folders/…        its extra persistent folders, if it has any
-import { spawn } from "node:child_process";
-import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { pipeline } from "node:stream/promises";
 import { config } from "../lib/config.ts";
 import { run } from "../lib/shell.ts";
 import * as s3 from "../lib/s3.ts";
-import { enabled as hasDatabase } from "../services/postgres/index.ts";
+import { enabled as hasDatabase, engineOf, typeOf, ENGINES, isDbType } from "../services/database/index.ts";
 import { enabled as hasStorage, clientFor as storageOf } from "../services/files/index.ts";
 import { hasAppData, dataPath, foldersPath, ensureDataDir } from "../lib/appdata.ts";
 import { containerName } from "../deploy/network.ts";
-
-const dbName = (app: string) => "app_" + app.replace(/-/g, "_");
-
-// Run a command, with stdout going into a file (or stdin coming from one).
-function pipeCmd(cmd: string, args: string[], io: { out?: string; in?: string }) {
-  const child = spawn(cmd, args, { stdio: [io.in ? "pipe" : "ignore", io.out ? "pipe" : "ignore", "pipe"] });
-  let err = "";
-  child.stderr.on("data", (d) => (err += d));
-  const exited = new Promise<void>((resolve, reject) => {
-    child.on("error", reject);
-    child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(err.trim().split("\n").pop() || `${cmd} failed`))));
-  });
-  // Wait for the file to be fully written (or read), not just for the command to end.
-  const streamed = io.out ? pipeline(child.stdout!, createWriteStream(io.out))
-    : io.in ? pipeline(createReadStream(io.in), child.stdin!) : Promise.resolve();
-  return Promise.all([exited, streamed]).then(() => {});
-}
 
 export const hasData = (app: string) => hasDatabase(app) || hasStorage(app) || hasAppData(app);
 
@@ -46,12 +28,13 @@ export async function pack(app: string, log: (l: string) => void) {
   const tmp = mkdtempSync(join(config.dataDir, "backups", ".tmp-"));
 
   try {
-    const meta = { app, createdAt: new Date().toISOString(), database: false, files: 0, dataFolder: false };
+    // database: false, or the type ("postgres", "mysql"). Older backups say true: that's PostgreSQL.
+    // SQLite has no dump: its file is in /data, saved below with the persistent folders.
+    const meta = { app, createdAt: new Date().toISOString(), database: false as false | string, files: 0, dataFolder: false };
 
-    if (hasDatabase(app)) {
+    if (hasDatabase(app) && typeOf(app) !== "sqlite") {
       log("Saving database…");
-      await pipeCmd("docker", ["exec", "postgres", "pg_dump", "-U", "postgres", "-Fc", dbName(app)], { out: join(tmp, "database.dump") });
-      meta.database = true;
+      if (await engineOf(app).dump(app, tmp)) meta.database = typeOf(app);
     }
 
     if (hasStorage(app)) {
@@ -95,12 +78,13 @@ export async function unpack(app: string, file: string, log: (l: string) => void
     const meta = JSON.parse(readFileSync(join(tmp, "meta.json"), "utf8"));
 
     if (meta.database) {
-      if (!hasDatabase(app)) throw new Error("This backup has a database, but the app doesn't have one now. Create the database first, then restore.");
+      const type = meta.database === true ? "postgres" : meta.database;
+      if (!isDbType(type)) throw new Error("This backup has a database type this server doesn't know.");
+      const label = ENGINES[type].label;
+      if (!hasDatabase(app)) throw new Error(`This backup has a ${label} database, but the app doesn't have one now. Create a ${label} database first, then restore.`);
+      if (typeOf(app) !== type) throw new Error(`This backup has a ${label} database, but the app now uses ${engineOf(app).label}. It can't be restored into a different type.`);
       log("Restoring database…");
-      await run("docker", ["exec", "postgres", "psql", "-U", "postgres", "-tAc",
-        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${dbName(app)}'`]);
-      await pipeCmd("docker", ["exec", "-i", "postgres", "pg_restore", "-U", "postgres", "--clean", "--if-exists",
-        "--no-owner", `--role=${dbName(app)}`, "-d", dbName(app)], { in: join(tmp, "database.dump") });
+      await ENGINES[type].restore(app, tmp);
     }
 
     if (existsSync(join(tmp, "storage"))) {

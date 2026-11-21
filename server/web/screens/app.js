@@ -9,13 +9,13 @@ import { filesPage } from "./files.js";
 import { logsPage } from "./logs.js";
 import { domainsPage } from "./domains.js";
 import { storagePage } from "./storage.js";
+import { databasePage } from "./database.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
   ["overview", "Overview", "home"],
   ["domains", "Domains", "globe"],
   ["storage", "Storage", "folder"],
-  ["email", "Email", "mail"],
   ["database", "Database", "db"],
   ["files", "Files", "file"],
   ["crons", "Crons", "clock"],
@@ -54,7 +54,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs: logsPage, variables, database, files: filesPage, storage, email, domains: domainsPage, crons, settings }[section] ?? overview;
+  const show = { overview, versions, logs: logsPage, variables, database: databasePage, files: filesPage, storage, domains: domainsPage, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -103,7 +103,7 @@ function overview(box, base, app) {
       <dl class="info">
         <dt>Address</dt><dd><a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></dd>
         ${app.filesUrl ? `<dt>Files</dt><dd><a href="${esc(app.filesUrl)}" target="_blank">${esc(app.filesUrl)}</a></dd>` : ""}
-        <dt>Services</dt><dd>${app.services.length ? app.services.map((x) => ({ database: "Database", storage: "Storage", email: "Email" })[x]).join(", ") : `<span class="muted">None. Add a database or storage from the menu.</span>`}</dd>
+        <dt>Services</dt><dd>${app.services.length ? app.services.map((x) => ({ database: "Database", storage: "Storage" })[x]).join(", ") : `<span class="muted">None. Add a database or storage from the menu.</span>`}</dd>
         <dt>Persistent storage</dt><dd id="folders"></dd>
         <dt>Last deploy</dt><dd>${timeAgo(app.deploys[0]?.created_at)}</dd>
         <dt>Container</dt><dd>${esc(app.state)}</dd>
@@ -379,7 +379,6 @@ async function variables(box, base) {
 
 // Danger zone at the bottom of the Database / Storage page.
 export function removeServiceBox(box, base, app, service) {
-  if (service === "email") return removeEmailBox(box, base);
   const db = service === "database";
   const el = document.createElement("div");
   el.className = "card pad danger-zone";
@@ -401,22 +400,8 @@ export function removeServiceBox(box, base, app, service) {
   };
 }
 
-function removeEmailBox(box, base) {
-  const el = document.createElement("div");
-  el.className = "card pad"; el.style.marginTop = "14px";
-  el.innerHTML = `<b>Remove email</b><p class="muted" style="font-size:13px;margin:2px 0 10px">The app restarts without the <code>SMTP_*</code> variables. Nothing is deleted.</p>
-    <button class="btn danger">${icon("trash")} Remove email</button>`;
-  box.append(el);
-  el.querySelector("button").onclick = async () => {
-    if (!confirm("Remove email from this app?")) return;
-    try { await api(`${base}/services/email`, { method: "DELETE" }); toast("Removed"); dispatchEvent(new HashChangeEvent("hashchange")); }
-    catch (err) { toast(err.message); }
-  };
-}
-
 // Shown when an app hasn't added a service yet.
 const SERVICE_TEXT = {
-  database: { icon: "db", title: "No database yet", button: "Create database", text: "Add a PostgreSQL database. Your app gets <code>DATABASE_URL</code> and restarts." },
   storage: { icon: "folder", title: "No file storage yet", button: "Create storage", text: "Add S3-compatible storage for uploads and images. Your app gets <code>S3_*</code> variables and restarts." },
 };
 
@@ -438,78 +423,6 @@ function addServicePage(box, base, service) {
       toast(err.message); b.disabled = false; b.textContent = t.button;
     }
   };
-}
-
-// Email: this app's own email provider (SMTP), and the variables the app gets from it.
-async function email(box, base, app) {
-  const m = await api(`${base}/email`);
-  box.innerHTML = `
-    <div class="card pad">
-      <b>${m ? "Email provider" : "Let this app send email"}</b>
-      <p class="muted" style="margin:2px 0 14px">${m
-        ? `Connected: <b>${esc(m.host)}</b>, sending as ${esc(m.from || m.user)}.`
-        : `Connect an email provider (Resend, Postmark, Mailgun, Brevo, Gmail…). The app gets <code>SMTP_URL</code> and <code>SMTP_*</code> variables and restarts.`}</p>
-      <form class="form">
-        <div class="row"><label style="flex:2">SMTP server<input name="host" value="${esc(m?.host ?? "")}" placeholder="smtp.resend.com" required></label>
-          <label style="flex:1">Port<input name="port" type="number" value="${m?.port ?? 587}"></label></div>
-        <div class="row"><label style="flex:1">Username<input name="user" value="${esc(m?.user ?? "")}" autocomplete="off"></label>
-          <label style="flex:1">Password<input name="pass" type="password" placeholder="${m?.hasPassword ? "unchanged" : ""}" autocomplete="new-password"></label></div>
-        <div class="row"><label style="flex:1">Send as<input name="from" value="${esc(m?.from ?? "")}" placeholder="My App &lt;hello@yourdomain.com&gt;"></label>
-          <label style="flex:1">Send a test to<input name="testTo" type="email" placeholder="you@example.com" required></label></div>
-        <p class="note">We send a test email first and only save if it arrives. Port 587 works almost everywhere; some hosts (like Hetzner) block 25 and 465.</p>
-        <div class="row" style="justify-content:flex-end"><button class="btn primary">Send test &amp; save</button></div>
-      </form>
-    </div>
-    <div id="vars"></div>`;
-
-  const f = box.querySelector("form");
-  f.onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = f.querySelector(".primary"); btn.disabled = true; btn.textContent = "Sending test…";
-    try {
-      await api(`${base}/email`, { method: "PUT", body: Object.fromEntries(new FormData(f)) });
-      toast("Test sent and saved. The app restarted.");
-      dispatchEvent(new HashChangeEvent("hashchange"));
-    } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Send test & save"; }
-  };
-  if (!m) return;
-
-  // Connected: show what the app got, and a way to remove it.
-  const vars = Object.fromEntries((await api(`${base}/env`)).map((v) => [v.key, v.value]));
-  box.querySelector("#vars").innerHTML = `
-    <div class="card pad" style="margin-top:14px">
-      <dl class="info">
-        ${field("SMTP_URL", vars.SMTP_URL, { secret: true })}
-        ${field("SMTP_HOST", vars.SMTP_HOST)}
-        ${field("SMTP_PORT", vars.SMTP_PORT)}
-        ${field("SMTP_FROM", vars.SMTP_FROM)}
-      </dl>
-      <p class="muted" style="font-size:13px;margin-top:12px">Your app already has these, plus <code>SMTP_USER</code>, <code>SMTP_PASS</code> and <code>SMTP_SECURE</code>. Send from <code>SMTP_FROM</code>.</p>
-    </div>`;
-  wireFields(box);
-  removeServiceBox(box, base, app, "email");
-}
-
-async function database(box, base, app) {
-  if (!app.services.includes("database")) return addServicePage(box, base, "database");
-  const db = await api(`${base}/database`);
-  const rows = db.tables.reduce((n, t) => n + t.rows, 0);
-  box.innerHTML = `
-    <div class="stats">
-      <div class="card stat"><b>${db.tables.length}</b><span>tables</span></div>
-      <div class="card stat"><b>${rows.toLocaleString()}</b><span>rows (approx.)</span></div>
-      <div class="card stat"><b>PostgreSQL 17</b><span>engine</span></div>
-    </div>
-    <div class="card pad" style="margin-bottom:14px">
-      <dl class="info">${field("DATABASE_URL", db.url, { secret: true })}</dl>
-      <p class="muted" style="font-size:13px;margin-top:10px">Your app already has this as <code>DATABASE_URL</code>. Only reachable from apps on this server.</p>
-    </div>
-    <div class="card list">${db.tables.map((t) => `
-      <div><span>${icon("db")}</span><code class="grow">${esc(t.table)}</code><span class="muted">${t.rows.toLocaleString()} rows</span></div>`).join("")
-      || `<div class="muted">No tables yet. They appear here when your app creates them.</div>`}
-    </div>`;
-  wireFields(box);
-  removeServiceBox(box, base, app, "database");
 }
 
 // Storage lives in storage.js. It needs addServicePage when the app has no storage yet.

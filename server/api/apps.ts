@@ -6,7 +6,7 @@ import { appUrl } from "../deploy/index.ts";
 import { containerState, appLogs, restart, remove, currentImage, activate, rename, stop, resume } from "../deploy/manage.ts";
 import { filesHost, bucketName, usage, clientFor, enabled as hasStorage } from "../services/files/index.ts";
 import * as s3 from "../lib/s3.ts";
-import { tables } from "../services/postgres/index.ts";
+import { enabled as hasDb, engineOf, typeOf as dbTypeOf, isDbType } from "../services/database/index.ts";
 import { getGit, webhookSecret, setGitOptions } from "../deploy/git.ts";
 import { previewsOf } from "../deploy/previews.ts";
 import { backupNow } from "../backups/index.ts";
@@ -19,9 +19,7 @@ import { config } from "../lib/config.ts";
 import { share } from "./share.ts";
 import { isAdmin } from "./auth.ts";
 import { crons } from "./crons.ts";
-import { enabledServices, addService, removeService, isService } from "../services/index.ts";
-import { getAppMail, saveAppMail } from "../services/email/index.ts";
-import { sendEmail } from "../alerts/channels/email.ts";
+import { enabledServices, addService, removeService, isService, parseService } from "../services/index.ts";
 import { logLines } from "../lib/logs.ts";
 import { DATA_DIR, extraFolders, saveExtraFolders } from "../lib/appdata.ts";
 
@@ -182,10 +180,43 @@ apps.post("/:name/versions/:id/activate", async (c) => {
   catch (e) { return c.json({ error: (e as Error).message }, 400); }
 });
 
+// --- Database (the Database page and its viewer) ---------------------------------
+
+// Which database, how big, and its tables.
 apps.get("/:name/database", async (c) => {
   const name = c.req.param("name");
-  return c.json({ url: getEnv(name).DATABASE_URL ?? null, tables: await tables(name) });
+  if (!hasDb(name)) return c.json({ type: null });
+  const engine = engineOf(name);
+  // If the database server is down, still show the page (with the error), so it can be fixed or deleted.
+  let tables: unknown[] = [], error: string | null = null;
+  try { tables = await engine.tables(name); } catch (e) { error = `Couldn't read the database: ${(e as Error).message}`; }
+  return c.json({ type: dbTypeOf(name), label: engine.label, url: getEnv(name).DATABASE_URL, size: await engine.size(name).catch(() => null), tables, error });
 });
+
+// Runs `fn` with the app's database, and turns errors into friendly 400s.
+async function withDb(c: any, fn: (name: string) => Promise<Response>) {
+  const name = c.req.param("name");
+  if (!hasDb(name)) return c.json({ error: "This app has no database yet." }, 404);
+  try { return await fn(name); } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+}
+
+// One table: its columns and a page of rows (?page=0, 100 rows each).
+apps.get("/:name/database/tables/:table", (c) => withDb(c, async (name) => {
+  const engine = engineOf(name), table = c.req.param("table");
+  if (!(await engine.tables(name)).some((t) => t.name === table)) throw new Error("Table not found.");
+  const page = Math.max(0, Number(c.req.query("page")) || 0), limit = 100;
+  const [columns, rows] = await Promise.all([engine.columns(name, table), engine.browse(name, table, page * limit, limit)]);
+  return c.json({ columns, rows, page, limit });
+}));
+
+// Run any SQL, as the app's own database user. At most 1000 rows come back.
+apps.post("/:name/database/query", (c) => withDb(c, async (name) => {
+  const { sql } = await c.req.json().catch(() => ({}));
+  if (!String(sql ?? "").trim()) throw new Error("Type some SQL first.");
+  const started = Date.now();
+  const result = await engineOf(name).query(name, String(sql), 1000);
+  return c.json({ ...result, ms: Date.now() - started });
+}));
 
 // Persistent storage: /data is always there; save the extra folders, then restart
 // so the new container has them.
@@ -357,11 +388,15 @@ apps.put("/:name/free-address", async (c) => {
 // Add a database or file storage to an app, then restart it so it sees the new variables.
 apps.post("/:name/services/:service", async (c) => {
   const { name, service } = c.req.param();
-  if (!isService(service)) return c.json({ error: "Use database, storage or email." }, 400);
+  // "database" with { type } in the body, or the type as the name ("mysql", "sqlite", "postgres").
+  const wanted = parseService(service);
+  if (!wanted) return c.json({ error: "Use database (or postgres, mysql, sqlite) or storage." }, 400);
+  const { type } = await c.req.json().catch(() => ({}));
+  if (type !== undefined && !isDbType(type)) return c.json({ error: "Database type: postgres, mysql or sqlite." }, 400);
   if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
   lock(name);
   try {
-    await addService(name, service);
+    await addService(name, wanted.service, () => {}, wanted.type ?? type);
     await syncRoutes();
     await restart(name).catch(() => {}); // fine if it was never deployed
     return c.json({ ok: true, services: enabledServices(name) });
@@ -370,28 +405,6 @@ apps.post("/:name/services/:service", async (c) => {
   } finally {
     unlock(name);
   }
-});
-
-// Email for this app: its own provider (SMTP). The password never goes back to the browser.
-apps.get("/:name/email", (c) => {
-  const m = getAppMail(c.req.param("name"));
-  return c.json(m ? { host: m.host, port: m.port, user: m.user, from: m.from, hasPassword: Boolean(m.pass) } : null);
-});
-
-// Save only if a test email gets through. Then restart, so the app sees the new SMTP_* variables.
-apps.put("/:name/email", async (c) => {
-  const name = c.req.param("name");
-  const b = await c.req.json().catch(() => ({}));
-  const old = getAppMail(name);
-  const m = { host: String(b.host ?? "").trim(), port: Number(b.port) || 587, user: String(b.user ?? "").trim(),
-    pass: b.pass ? String(b.pass) : old?.pass ?? "", from: String(b.from ?? "").trim() };
-  if (!m.host) return c.json({ error: "Fill in the SMTP server." }, 400);
-  if (!b.testTo) return c.json({ error: "Enter an address for the test email." }, 400);
-  try { await sendEmail({ type: "email", ...m, to: String(b.testTo) }, `${displayName(name)}: email works`, "This app can now send email through this provider."); }
-  catch (e) { return c.json({ error: `The test email didn't go through: ${(e as Error).message}` }, 400); }
-  saveAppMail(name, m);
-  await restart(name).catch(() => {}); // fine if it was never deployed
-  return c.json({ ok: true });
 });
 
 // Auto-deploy and PR preview switches; reset the webhook secret.
@@ -406,11 +419,11 @@ apps.put("/:name/git", async (c) => {
 // Remove a database or storage and DELETE its data. A last backup is made first.
 apps.delete("/:name/services/:service", async (c) => {
   const { name, service } = c.req.param();
-  if (!isService(service)) return c.json({ error: "Use database, storage or email." }, 400);
+  if (!isService(service)) return c.json({ error: "Use database or storage." }, 400);
   if (!enabledServices(name).includes(service)) return c.json({ ok: true, services: enabledServices(name) });
   if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
   const isPreview = !!previewInfo(name).previewOf;
-  if (!isPreview && service !== "email") { // email has no data to back up
+  if (!isPreview) {
     try { await backupNow(name); }
     catch (e) { return c.json({ error: `Couldn't make a last backup, so nothing was deleted: ${(e as Error).message}` }, 409); }
     const last = db.prepare("SELECT status, note FROM backups WHERE app = ? ORDER BY id DESC LIMIT 1").get(name) as { status: string; note: string } | undefined;
