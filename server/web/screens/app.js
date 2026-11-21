@@ -8,6 +8,7 @@ import { bytes } from "../app.js";
 import { filesPage } from "./files.js";
 import { logsPage } from "./logs.js";
 import { domainsPage } from "./domains.js";
+import { storagePage } from "./storage.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -59,14 +60,14 @@ export async function appScreen(view, name, section) {
 }
 
 // A label + value row with a copy button. Hidden values show dots until "Show".
-function field(label, value, { secret = false } = {}) {
+export function field(label, value, { secret = false } = {}) {
   if (!value) return `<dt>${label}</dt><dd class="muted">—</dd>`;
   return `<dt>${label}</dt><dd class="row" style="gap:8px;flex-wrap:nowrap">
     <span class="grow secret" ${secret ? `data-val="${esc(value)}"` : ""}>${secret ? "••••••••" : esc(value)}</span>
     ${secret ? `<button class="btn" data-show>Show</button>` : ""}
     <button class="btn" data-copy="${esc(value)}">${icon("copy")}</button></dd>`;
 }
-function wireFields(box) {
+export function wireFields(box) {
   box.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => copy(b.dataset.copy)));
   box.querySelectorAll("[data-show]").forEach((b) => (b.onclick = () => {
     const span = b.previousElementSibling, hidden = span.textContent.startsWith("•");
@@ -377,7 +378,7 @@ async function variables(box, base) {
 }
 
 // Danger zone at the bottom of the Database / Storage page.
-function removeServiceBox(box, base, app, service) {
+export function removeServiceBox(box, base, app, service) {
   if (service === "email") return removeEmailBox(box, base);
   const db = service === "database";
   const el = document.createElement("div");
@@ -511,26 +512,5 @@ async function database(box, base, app) {
   removeServiceBox(box, base, app, "database");
 }
 
-async function storage(box, base, app) {
-  if (!app.services.includes("storage")) return addServicePage(box, base, "storage");
-  const s = await api(`${base}/storage`);
-  box.innerHTML = `
-    <div class="stats">
-      <div class="card stat"><b>${s.objects.toLocaleString()}</b><span>files</span></div>
-      <div class="card stat"><b>${esc(s.size)}</b><span>used</span></div>
-      <div class="card stat"><b>S3</b><span>compatible</span></div>
-    </div>
-    <div class="card pad">
-      <dl class="info">
-        ${field("Public URL", s.publicUrl)}
-        ${field("Bucket", s.bucket)}
-        ${field("Endpoint", s.endpoint)}
-        ${field("Access key", s.accessKey)}
-        ${field("Secret key", s.secretKey, { secret: true })}
-      </dl>
-      <p class="muted" style="font-size:13px;margin-top:12px">Your app already has these as <code>S3_*</code> variables. Uploaded files are public at
-        <code>${esc(s.publicUrl)}/&lt;file&gt;</code>. In S3 SDKs set <code>forcePathStyle: true</code>.</p>
-    </div>`;
-  wireFields(box);
-  removeServiceBox(box, base, app, "storage");
-}
+// Storage lives in storage.js. It needs addServicePage when the app has no storage yet.
+const storage = (box, base, app) => storagePage(box, base, app, addServicePage);

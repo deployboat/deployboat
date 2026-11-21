@@ -71,12 +71,44 @@ export async function download(s3: S3, key: string, file: string) {
   await pipeline(Readable.fromWeb(res.body as any), createWriteStream(file));
 }
 
+// Content type from the file name, so browsers show images and pages instead of downloading
+// them. Used when restoring a backup (which keeps the files, not their types).
+const TYPES: Record<string, string> = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp", avif: "image/avif",
+  svg: "image/svg+xml", ico: "image/x-icon", pdf: "application/pdf", json: "application/json", txt: "text/plain",
+  html: "text/html", css: "text/css", js: "text/javascript", mp4: "video/mp4", webm: "video/webm", mp3: "audio/mpeg",
+  wav: "audio/wav", zip: "application/zip", csv: "text/csv", xml: "application/xml", woff2: "font/woff2",
+};
+export const typeOf = (key: string) => TYPES[key.split(".").pop()?.toLowerCase() ?? ""] ?? "application/octet-stream";
+
 export async function upload(s3: S3, key: string, file: string) {
-  await request(s3, "PUT", key, { body: Readable.toWeb(createReadStream(file)), length: statSync(file).size });
+  await request(s3, "PUT", key, { body: Readable.toWeb(createReadStream(file)), length: statSync(file).size, headers: { "content-type": typeOf(key) } });
 }
 
 export async function remove(s3: S3, key: string) {
   await request(s3, "DELETE", key);
+}
+
+// One "folder" of a bucket, for browsing: the sub-folders and files right under `prefix`.
+// S3 has no real folders; "a/b.png" just has a "/" in its name. The delimiter groups them.
+export async function browse(s3: S3, prefix = "", token?: string) {
+  const res = await request(s3, "GET", "", {
+    query: { "list-type": "2", prefix, delimiter: "/", "max-keys": "500", ...(token && { "continuation-token": token }) },
+  });
+  const xml = await res.text();
+  const folders = [...xml.matchAll(/<CommonPrefixes>\s*<Prefix>([^<]*)<\/Prefix>/g)].map((m) => decodeXml(m[1]));
+  const files = [...xml.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)].map((m) => ({
+    key: decodeXml(m[1].match(/<Key>([^<]*)<\/Key>/)?.[1] ?? ""),
+    size: Number(m[1].match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0),
+    modified: m[1].match(/<LastModified>([^<]+)/)?.[1] ?? "",
+  })).filter((f) => f.key !== prefix); // a "folder marker" object is the folder itself
+  const next = /<IsTruncated>true<\/IsTruncated>/.test(xml) ? decodeXml(xml.match(/<NextContinuationToken>([^<]+)/)?.[1] ?? "") : null;
+  return { folders, files, next };
+}
+
+// Upload from a stream (a browser upload passed through). `length` must be known.
+export async function put(s3: S3, key: string, body: ReadableStream | Uint8Array, length: number, type = "application/octet-stream") {
+  await request(s3, "PUT", key, { body, length, headers: { "content-type": type } });
 }
 
 // Quick check that the settings work: list (at most) one object.

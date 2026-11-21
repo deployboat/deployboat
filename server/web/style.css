@@ -660,3 +660,42 @@ a.domhost:hover { color: var(--accent); }
   color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); cursor: default; }
 .statchip.live { --c: var(--ok); } .statchip.stopped { --c: var(--muted); } .statchip.failed { --c: var(--bad); } .statchip.building { --c: var(--warn); }
 .statchip .status { gap: 0; }
+
+/* App → Storage */
+.stlink { min-width: 0; grid-column: span 2; }
+@media (max-width: 600px) { .stlink { grid-column: auto; } }
+.stlink > span { font-size: 12.5px; color: var(--muted); }
+.stlink code { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stfiles { position: relative; overflow: hidden; }
+.stbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line); }
+.stbar .fb-crumbs a { display: inline-flex; align-items: center; gap: 5px; }
+.stbar .fb-crumbs svg.i { width: 14px; height: 14px; }
+.stprogress { display: flex; align-items: center; gap: 8px; padding: 8px 18px; font-size: 13px; color: var(--accent); background: var(--soft); }
+.stprogress[hidden] { display: none; }
+.stlist { position: relative; min-height: 120px; max-height: 520px; overflow-y: auto; transition: opacity .15s; }
+.stlist.busy { opacity: .45; pointer-events: none; }
+.strow { display: flex; align-items: center; gap: 12px; padding: 7px 14px 7px 18px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13.5px; }
+.strow.file { cursor: default; }
+.strow:hover { background: var(--bg); }
+.stthumb { width: 32px; height: 32px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); display: grid; place-items: center; flex: none; overflow: hidden; color: var(--muted); }
+.stthumb { position: relative; }
+.stthumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--bg); }
+.stthumb svg.i { width: 16px; height: 16px; }
+.stname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); text-decoration: none; }
+a.stname:hover { color: var(--accent); }
+.stmeta { width: 80px; text-align: right; color: var(--muted); font-size: 12.5px; white-space: nowrap; flex: none; }
+.stacts { display: flex; gap: 2px; width: 96px; justify-content: flex-end; flex: none; opacity: 0; }
+.strow:hover .stacts { opacity: 1; }
+@media (hover: none) { .stacts { opacity: 1; } }
+.stacts .danger:hover { color: var(--bad); }
+.stempty { text-align: center; padding: 36px 16px; color: var(--muted); }
+.stempty > svg.i { width: 26px; height: 26px; margin-bottom: 6px; }
+.stempty b { color: var(--ink); }
+.stmore { margin: 10px auto; display: block; }
+.stfiles.dragging .fb-drop { display: flex; }
+.stdetails summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.stdetails summary::-webkit-details-marker { display: none; }
+.stdetails .chev svg.i { transition: transform .15s; width: 16px; height: 16px; }
+.stdetails[open] .chev svg.i { transform: rotate(90deg); }
+.stdetails summary .note { margin-left: auto; }
+@media (max-width: 700px) { .stmeta:nth-of-type(2) { display: none; } .stdetails summary .note { display: none; } }

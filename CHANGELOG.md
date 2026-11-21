@@ -13,6 +13,8 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 - **A new Logs page with tabs:** Runtime (live), Errors, Debug, Deploys (each version's build log) and Cron jobs (each run's output). Each line gets a time and a level (worked out from JSON logs or words like ERROR/WARN, with stack traces kept together). Search with highlights, level filters, pause/resume, jump to latest, wrap, copy and download.
 - **Sharing moved to the app's Overview**, next to the details: QR code, links to copy, and public or password protected in a few clicks. The separate Share page is gone.
 - **Domains in one table.** The free address is a row like any other: edit it (renames the app) or turn it off once the app has a domain of its own. Your domains can be renamed or removed too. Each row shows its status, with step-by-step DNS help, a countdown to the next check, Check now, and "also add www" when adding.
+- **A file browser on the Storage page.** Browse folders, upload (drag and drop works), copy a file's public link, open, and delete files or whole folders, with image previews. Code examples for Node.js and Python, and the connection details tucked away.
+- Fixed: files restored from a backup into storage lost their type, so images downloaded instead of showing. They now get the right type from their name.
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0

@@ -4,7 +4,8 @@ import { db } from "../lib/db.ts";
 import { getEnv, setEnv, deleteEnv, isBuiltin } from "../lib/env.ts";
 import { appUrl } from "../deploy/index.ts";
 import { containerState, appLogs, restart, remove, currentImage, activate, rename, stop, resume } from "../deploy/manage.ts";
-import { filesHost, bucketName, usage } from "../services/files/index.ts";
+import { filesHost, bucketName, usage, clientFor, enabled as hasStorage } from "../services/files/index.ts";
+import * as s3 from "../lib/s3.ts";
 import { tables } from "../services/postgres/index.ts";
 import { getGit, webhookSecret, setGitOptions } from "../deploy/git.ts";
 import { previewsOf } from "../deploy/previews.ts";
@@ -204,11 +205,52 @@ apps.get("/:name/storage", async (c) => {
     bucket: bucketName(name),
     publicUrl: `https://${filesHost(name)}`,
     endpoint: env.S3_ENDPOINT ?? null,
+    region: env.S3_REGION ?? null,
     accessKey: env.S3_ACCESS_KEY ?? null,
     secretKey: env.S3_SECRET_KEY ?? null,
     ...(await usage(name)),
   });
 });
+
+// --- Storage file browser (the Storage page) ---------------------------------------
+
+// A file name in the bucket, like "avatars/42.png". Throws on odd ones.
+function storageKey(raw: unknown) {
+  const key = String(raw ?? "").replace(/^\/+/, "");
+  if (!key || key.length > 1024 || key.split("/").some((p) => p === ".." || p === ".")) throw new Error("That's not a valid file name.");
+  return key;
+}
+// Runs `fn` with an S3 client for the app's bucket, and turns errors into friendly 400s.
+async function withBucket(c: any, fn: (client: s3.S3) => Promise<Response>) {
+  const name = c.req.param("name");
+  if (!hasStorage(name)) return c.json({ error: "This app has no storage yet." }, 404);
+  try { return await fn(await clientFor(name)); }
+  catch (e) { return c.json({ error: (e as Error).message }, 400); }
+}
+
+// What's in one folder: ?prefix=avatars/ (empty for the top), &next= for the next page.
+apps.get("/:name/storage/files", (c) => withBucket(c, async (client) => {
+  const prefix = c.req.query("prefix") ?? "";
+  return c.json(await s3.browse(client, prefix, c.req.query("next") || undefined));
+}));
+
+// Upload one file: the raw file is the body, its full name is ?key=.
+apps.post("/:name/storage/files", (c) => withBucket(c, async (client) => {
+  const key = storageKey(c.req.query("key"));
+  const length = Number(c.req.header("content-length"));
+  if (!Number.isFinite(length)) throw new Error("Upload size unknown. Try again.");
+  const body = c.req.raw.body ?? new Uint8Array();
+  await s3.put(client, key, body as ReadableStream, length, c.req.header("content-type") || "application/octet-stream");
+  return c.json({ ok: true, key });
+}));
+
+// Delete one file, or a whole folder (?key=avatars/ with the slash).
+apps.delete("/:name/storage/files", (c) => withBucket(c, async (client) => {
+  const key = storageKey(c.req.query("key"));
+  const keys = key.endsWith("/") ? (await s3.list(client, key)).map((o) => o.key) : [key];
+  for (const k of keys) await s3.remove(client, k);
+  return c.json({ ok: true, deleted: keys.length });
+}));
 
 apps.post("/:name/rename", async (c) => {
   const name = c.req.param("name");
