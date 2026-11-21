@@ -12,6 +12,7 @@ import { codeEditor } from "../editor.js";
 
 export async function filesPage(box, base, app) {
   const startPath = new URLSearchParams(location.hash.split("?")[1] ?? "").get("path") ?? "";
+  box.innerHTML = loading("Opening files…"); // the first load reaches into the container and can take a moment
   let d = await api(`${base}/files?path=${encodeURIComponent(startPath)}`);
 
   // The open file: { path, cm (the editor), saved (text when last saved) }.
@@ -97,9 +98,17 @@ export async function filesPage(box, base, app) {
   }
 
   // Open another folder, without leaving the page.
+  // Only the newest click counts: a slow earlier answer must not replace a newer one.
+  let goId = 0;
   async function go(path) {
-    try { d = await api(`${base}/files?path=${encodeURIComponent(path)}`); }
-    catch (err) { return toast(err.message); }
+    const id = ++goId;
+    list.classList.add("busy"); // dims the list and shows a spinner on top (style.css)
+    try {
+      const next = await api(`${base}/files?path=${encodeURIComponent(path)}`);
+      if (id !== goId) return;
+      d = next;
+    } catch (err) { if (id === goId) toast(err.message); return; }
+    finally { if (id === goId) list.classList.remove("busy"); }
     box.querySelector("#filter").value = "";
     history.replaceState(null, "", `#/apps/${encodeURIComponent(app.name)}/files?path=${encodeURIComponent(d.path)}`);
     drawAll();
@@ -159,12 +168,19 @@ export async function filesPage(box, base, app) {
     if (save) save.disabled = !dirty();
   }
 
+  let openId = 0;
   async function openFile(path, text) {
     if (dirty() && !confirm(`${open.path} has unsaved changes. Discard them?`)) return;
+    const id = ++openId;
     let reason = null;
     if (text === undefined) {
+      // Show where we're going right away, then the file once it's here.
+      open = null;
+      editor.innerHTML = `<div class="fb-edhead"><code class="fb-path grow">${esc(path)}</code></div>${loading("Loading file…")}`;
+      list.querySelectorAll(".fb-row").forEach((r) => r.classList.toggle("on", r.dataset.file === path));
       try { ({ text, reason } = await api(`${base}/files/text?path=${encodeURIComponent(path)}`)); }
-      catch (err) { return toast(err.message); }
+      catch (err) { if (id === openId) { toast(err.message); drawEmpty(); } return; }
+      if (id !== openId) return; // another file was clicked meanwhile
     }
     open = { path, cm: null, saved: text };
     editor.innerHTML = `
@@ -176,14 +192,19 @@ export async function filesPage(box, base, app) {
         ${reason ? "" : `<button class="btn primary" id="savefile" disabled title="Save (Ctrl+S)">${icon("save")} Save</button>`}
         <button class="btn ghost" id="closefile" title="Close">${icon("x")}</button>
       </div>
-      <div class="fb-code">${reason ? `<div class="fb-placeholder">${icon("file")}<p>${esc(reason)}</p></div>` : ""}</div>`;
+      <div class="fb-code">${reason ? `<div class="fb-placeholder">${icon("file")}<p>${esc(reason)}</p></div>` : loading("")}</div>`;
     drawEditorHead();
     drawList(); // highlight the open file
     editor.querySelector("#closefile").onclick = () => closeFile();
     if (reason) return;
     editor.querySelector("#savefile").onclick = save;
-    try { open.cm = await codeEditor(editor.querySelector(".fb-code"), text, path.split("/").pop()); }
-    catch { return toast("The editor couldn't load. Check your connection and try again."); }
+    const code = editor.querySelector(".fb-code");
+    try {
+      const cm = await codeEditor(code, text, path.split("/").pop()); // the first time, this also loads CodeMirror
+      if (id !== openId) return;
+      code.querySelector(".fb-loading")?.remove();
+      open.cm = cm;
+    } catch { return toast("The editor couldn't load. Check your connection and try again."); }
     open.cm.on("change", drawEditorHead);
     open.cm.focus();
   }
@@ -249,3 +270,6 @@ export async function filesPage(box, base, app) {
   drawEmpty();
   return () => { document.removeEventListener("keydown", onKey); removeEventListener("beforeunload", onLeave); };
 }
+
+// A spinner with a short text, centered in its box.
+const loading = (text) => `<div class="fb-loading"><span class="spinner"></span>${text ? `<span>${text}</span>` : ""}</div>`;
