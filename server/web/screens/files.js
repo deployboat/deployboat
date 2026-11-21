@@ -7,6 +7,7 @@
 // Moving between folders doesn't reload the page, so an open file stays open.
 // The folder is kept in the address (?path=), so a refresh comes back to it.
 import { api, esc, icon, toast, bytes, timeAgo, copy } from "../app.js";
+import { ask, askText } from "../dialog.js";
 import { openMenu } from "../menu.js";
 import { codeEditor } from "../editor.js";
 
@@ -107,7 +108,7 @@ export async function filesPage(box, base, app) {
       const next = await api(`${base}/files?path=${encodeURIComponent(path)}`);
       if (id !== goId) return;
       d = next;
-    } catch (err) { if (id === goId) toast(err.message); return; }
+    } catch (err) { if (id === goId) toast(err.message, "error"); return; }
     finally { if (id === goId) list.classList.remove("busy"); }
     box.querySelector("#filter").value = "";
     history.replaceState(null, "", `#/apps/${encodeURIComponent(app.name)}/files?path=${encodeURIComponent(d.path)}`);
@@ -132,19 +133,19 @@ export async function filesPage(box, base, app) {
         const action = b.dataset.a;
         if (action === "copy") return copy(path);
         if (action === "rename") {
-          const name = prompt("New name", path.split("/").pop());
+          const name = await askText({ title: "Rename", label: "New name", value: path.split("/").pop(), ok: "Rename" });
           if (!name || name.includes("/")) return;
           const to = parentOf(path).replace(/\/$/, "") + "/" + name;
           try { await api(`${base}/files/rename`, { method: "POST", body: { from: path, to } }); toast("Renamed"); }
-          catch (err) { return toast(err.message); }
+          catch (err) { return toast(err.message, "error"); }
           if (open?.path === path) { open.path = to; drawEditorHead(); }
           return reload();
         }
         if (action === "delete") {
           const what = isDir ? "this folder and everything in it" : "this file";
-          if (!confirm(`Delete ${what}?\n\n${path}\n\nYour app may need it. This can't be undone.`)) return;
+          if (!(await ask({ title: `Delete ${what}?`, text: `${path}\n\nYour app may need it. This can't be undone.`, ok: "Delete", danger: true }))) return;
           try { await api(`${base}/files?path=${encodeURIComponent(path)}`, { method: "DELETE" }); toast("Deleted"); }
-          catch (err) { return toast(err.message); }
+          catch (err) { return toast(err.message, "error"); }
           if (open?.path === path) closeFile(true);
           reload();
         }
@@ -170,7 +171,7 @@ export async function filesPage(box, base, app) {
 
   let openId = 0;
   async function openFile(path, text) {
-    if (dirty() && !confirm(`${open.path} has unsaved changes. Discard them?`)) return;
+    if (dirty() && !(await ask({ title: "Discard your changes?", text: `${open.path} has unsaved changes.`, ok: "Discard", danger: true }))) return;
     const id = ++openId;
     let reason = null;
     if (text === undefined) {
@@ -179,7 +180,7 @@ export async function filesPage(box, base, app) {
       editor.innerHTML = `<div class="fb-edhead"><code class="fb-path grow">${esc(path)}</code></div>${loading("Loading file…")}`;
       list.querySelectorAll(".fb-row").forEach((r) => r.classList.toggle("on", r.dataset.file === path));
       try { ({ text, reason } = await api(`${base}/files/text?path=${encodeURIComponent(path)}`)); }
-      catch (err) { if (id === openId) { toast(err.message); drawEmpty(); } return; }
+      catch (err) { if (id === openId) { toast(err.message, "error"); drawEmpty(); } return; }
       if (id !== openId) return; // another file was clicked meanwhile
     }
     open = { path, cm: null, saved: text };
@@ -204,13 +205,13 @@ export async function filesPage(box, base, app) {
       if (id !== openId) return;
       code.querySelector(".fb-loading")?.remove();
       open.cm = cm;
-    } catch { return toast("The editor couldn't load. Check your connection and try again."); }
+    } catch { return toast("The editor couldn't load. Check your connection and try again.", "error"); }
     open.cm.on("change", drawEditorHead);
     open.cm.focus();
   }
 
-  function closeFile(force = false) {
-    if (!force && dirty() && !confirm("Discard your unsaved changes?")) return;
+  async function closeFile(force = false) {
+    if (!force && dirty() && !(await ask({ title: "Discard your changes?", text: `${open.path} has unsaved changes.`, ok: "Discard", danger: true }))) return;
     open = null;
     drawEmpty();
     drawList();
@@ -225,7 +226,7 @@ export async function filesPage(box, base, app) {
       drawEditorHead();
       toast("Saved");
       if (parentOf(open.path) === d.path) reload(); // new size / new file in the list
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   }
 
   // --- toolbar, uploads, keyboard ------------------------------------------
@@ -233,13 +234,13 @@ export async function filesPage(box, base, app) {
   box.querySelector("#filter").oninput = drawList;
 
   box.querySelector("#newdir").onclick = async () => {
-    const name = prompt("Folder name");
+    const name = await askText({ title: "New folder", label: "Folder name", placeholder: "uploads", ok: "Create" });
     if (!name) return;
     try { await api(`${base}/files/folder`, { method: "POST", body: { path: join(name) } }); reload(); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
   };
-  box.querySelector("#newfile").onclick = () => {
-    const name = prompt("File name, like config.json");
+  box.querySelector("#newfile").onclick = async () => {
+    const name = await askText({ title: "New file", label: "File name", placeholder: "config.json", ok: "Create" });
     if (name) openFile(join(name), ""); // saved when you press Save
   };
 
@@ -247,7 +248,7 @@ export async function filesPage(box, base, app) {
     for (const file of files) {
       toast(`Uploading ${file.name}…`);
       const res = await fetch(`${base}/files/upload?path=${encodeURIComponent(join(file.name))}`, { method: "POST", body: file });
-      if (!res.ok) return toast((await res.json().catch(() => ({}))).error ?? `Couldn't upload ${file.name}.`);
+      if (!res.ok) return toast((await res.json().catch(() => ({}))).error ?? `Couldn't upload ${file.name}.`, "error");
     }
     toast(files.length === 1 ? "Uploaded" : `${files.length} files uploaded`);
     reload();

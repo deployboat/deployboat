@@ -1,5 +1,6 @@
 // Settings → Security: the main token (full access) and agent tokens (limited, for the CLI and AI agents).
 import { api, esc, icon, copy, toast, timeAgo } from "../app.js";
+import { ask } from "../dialog.js";
 
 export async function securityPage(view) {
   const s = await api("/api/settings");
@@ -42,13 +43,14 @@ export async function securityPage(view) {
   };
   view.querySelector("#copytok").onclick = () => copy(tok.value);
   view.querySelector("#reset").onclick = async () => {
-    if (!confirm("Make a new main token?\n\nThe old one stops working right away. Other browsers are logged out, and any computer logged in with the main token must log in again. You stay logged in here.")) return;
+    if (!(await ask({ title: "Make a new main token?", ok: "Make new token", danger: true,
+      text: "The old one stops working right away. Other browsers are logged out, and any computer logged in with the main token must log in again. You stay logged in here." }))) return;
     try {
       const r = await api("/api/settings/reset-token", { method: "POST" });
       tok.value = r.token; tok.type = "text";
       view.querySelector("#show").textContent = "Hide";
       toast("New main token created. Save it somewhere safe.");
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   };
 
   // Agent tokens: create one, list them, revoke.
@@ -81,7 +83,7 @@ function newTokenForm(view) {
       box.querySelector("#cp").onclick = () => copy(r.token);
       box.querySelector("[data-x]").onclick = () => (box.innerHTML = "");
       drawTokens(view);
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   };
 }
 
@@ -96,7 +98,7 @@ async function drawTokens(view) {
     </div>`).join("")
     || `<div class="muted">No agent tokens yet. Make one when you connect the CLI or an AI agent.</div>`;
   el.querySelectorAll("[data-revoke]").forEach((b) => (b.onclick = async () => {
-    if (!confirm("Revoke this token? Anything using it stops working right away.")) return;
+    if (!(await ask({ title: "Revoke this token?", text: "Anything using it stops working right away.", ok: "Revoke", danger: true }))) return;
     await api(`/api/tokens/${b.dataset.revoke}`, { method: "DELETE" });
     toast("Revoked");
     drawTokens(view);

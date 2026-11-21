@@ -4,6 +4,7 @@
 // the CLI…), when and how long it took, and actions: see the build log, or switch the live
 // site to that version (roll back). A version that's building shows its log live.
 import { api, esc, icon, toast, timeAgo } from "../app.js";
+import { ask } from "../dialog.js";
 import { buildLevel } from "./logs.js";
 
 const STATUS = { live: ["ok", "Built"], failed: ["bad", "Failed"], building: ["info", "Building"] };
@@ -105,19 +106,19 @@ export async function versionsPage(box, base, app) {
   }
 
   async function rollBack(b) {
-    if (!confirm(`Switch the live site to version #${b.dataset.use}?\n\nIt takes a few seconds. You can switch back any time.`)) return;
+    if (!(await ask({ title: `Switch the live site to version #${b.dataset.use}?`, text: "It takes a few seconds. You can switch back any time.", ok: "Roll back" }))) return;
     b.disabled = true; b.innerHTML = `<span class="spinner sm"></span> Switching…`;
     try {
       await api(`${base}/versions/${b.dataset.use}/activate`, { method: "POST" });
       toast(`Now running version #${b.dataset.use}`);
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
     refresh();
   }
 
   async function redeploy(e) {
     e.currentTarget.disabled = true;
     try { await api(`/api/git/redeploy/${encodeURIComponent(app.name)}`, { method: "POST" }); toast("Deploy started"); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
     setTimeout(refresh, 1200);
   }
 
@@ -133,7 +134,7 @@ export async function versionsPage(box, base, app) {
     deploys = fresh.deploys;
     const building = deploys.find((d) => d.status === "building");
     if (building) openLogs.add(building.id); // show the build as it happens
-    if (wasBuilding && !building) toast(deploys.find((d) => d.id === wasBuilding.id)?.status === "live" ? `Version #${wasBuilding.id} is live` : `Version #${wasBuilding.id} failed. See its log.`);
+    if (wasBuilding && !building) toast(deploys.find((d) => d.id === wasBuilding.id)?.status === "live" ? `Version #${wasBuilding.id} is live` : `Version #${wasBuilding.id} failed. See its log.`, deploys.find((d) => d.id === wasBuilding.id)?.status === "live" ? "ok" : "error");
     draw();
   }
 

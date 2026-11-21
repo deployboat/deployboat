@@ -5,6 +5,7 @@
 //
 // Every save restarts the app once, so it reads the new values. Values are hidden until "Show".
 import { api, esc, icon, toast, copy } from "../app.js";
+import { ask } from "../dialog.js";
 
 // Deploy Boat's own variables, grouped, with what they're for.
 const BUILTIN_GROUPS = [
@@ -133,7 +134,7 @@ export async function variablesPage(box, base, app) {
       e.preventDefault();
       const old = f.dataset.form, key = cleanName(f.key.value);
       try { await save({ vars: { [key]: f.value.value }, remove: key !== old ? [old] : [] }, key !== old ? `Renamed to ${key}` : `${key} saved`); editing = null; draw(); }
-      catch (err) { toast(err.message); }
+      catch (err) { toast(err.message, "error"); }
     };
   }
 
@@ -144,9 +145,9 @@ export async function variablesPage(box, base, app) {
     if (a === "edit") { editing = key; shown.add(key); return draw(); }
     if (a === "cancel") { editing = null; return draw(); }
     if (a === "delete") {
-      if (!confirm(`Delete ${key}?\n\nThe app restarts without it.`)) return;
+      if (!(await ask({ title: `Delete ${key}?`, text: "The app restarts without it.", ok: "Delete", danger: true }))) return;
       try { await api(`${base}/env/${encodeURIComponent(key)}`, { method: "DELETE" }); toast(`${key} deleted. The app restarted.`); load(); }
-      catch (err) { toast(err.message); }
+      catch (err) { toast(err.message, "error"); }
     }
   }
 
@@ -184,7 +185,7 @@ export async function variablesPage(box, base, app) {
       e.preventDefault();
       const b = f.querySelector(".primary"); b.disabled = true;
       try { await save({ vars: { [f.key.value]: f.value.value } }, `${f.key.value} added`); fb.innerHTML = ""; }
-      catch (err) { toast(err.message); b.disabled = false; }
+      catch (err) { toast(err.message, "error"); b.disabled = false; }
     };
   }
 
@@ -219,7 +220,7 @@ export async function variablesPage(box, base, app) {
       const parsed = parseEnv(f.text.value);
       btn.disabled = true;
       try { await save({ vars: parsed }, `${Object.keys(parsed).length} variables saved`); fb.innerHTML = ""; }
-      catch (err) { toast(err.message); btn.disabled = false; }
+      catch (err) { toast(err.message, "error"); btn.disabled = false; }
     };
   }
 

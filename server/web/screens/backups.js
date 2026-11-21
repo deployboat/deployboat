@@ -3,6 +3,7 @@
 // The page is drawn once. After that, only the parts that change (summary, progress, list)
 // are refreshed, so forms you're typing in are never wiped by a refresh.
 import { api, esc, icon, toast, timeAgo, bytes, copy } from "../app.js";
+import { ask, askTyped } from "../dialog.js";
 
 export async function backupsScreen(view) {
   let d = await api("/api/backups");
@@ -66,7 +67,7 @@ export async function backupsScreen(view) {
         } });
         toast("Saved");
         drawSchedule(); drawLive();
-      } catch (err) { toast(err.message); }
+      } catch (err) { toast(err.message, "error"); }
     };
   }
 
@@ -91,7 +92,7 @@ export async function backupsScreen(view) {
 
     const done = async () => { d = await api("/api/backups"); drawRemote(); drawLive(); };
     el.querySelector("#disconnect")?.addEventListener("click", async () => {
-      if (!confirm("Stop copying backups off-server? Copies already there are kept.")) return;
+      if (!(await ask({ title: "Stop copying backups off-server?", text: "Copies already there are kept.", ok: "Disconnect" }))) return;
       await api("/api/backups/remote", { method: "DELETE" });
       toast("Disconnected");
       done();
@@ -107,15 +108,16 @@ export async function backupsScreen(view) {
       await api(`/api/backups/run${app ? `?app=${encodeURIComponent(app)}` : ""}`, { method: "POST" });
       toast("Backup started");
       refresh();
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   }
 
   async function restoreBackup(id, app) {
-    const typed = prompt(`Restore this backup of ${app}?\n\nThe app stops for a moment, and its current database and stored files are REPLACED with the backup.\n\nType the app name (${app}) to confirm:`);
-    if (typed !== app) { if (typed !== null) toast("Name didn't match. Nothing changed."); return; }
+    // The button only unlocks once the name is typed, so there's no "didn't match" case.
+    if (!(await askTyped({ title: `Restore this backup of ${app}?`, word: app, ok: "Restore",
+      text: "The app stops for a moment, and its current data is REPLACED with what's in the backup." }))) return;
     restoring.add(id); drawLive();
     try { await api(`/api/backups/${id}/restore`, { method: "POST" }); toast(`${app} restored`); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
     restoring.delete(id);
     refresh();
   }
@@ -223,7 +225,7 @@ function s3Form(box, done) {
       await api("/api/backups/remote/s3", { method: "PUT", body: Object.fromEntries(new FormData(f)) });
       toast("Connected");
       done();
-    } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Test & save"; }
+    } catch (err) { toast(err.message, "error"); btn.disabled = false; btn.textContent = "Test & save"; }
   };
 }
 
@@ -270,9 +272,9 @@ function driveForm(box, done) {
           const p = await api("/api/backups/remote/gdrive/poll", { method: "POST" });
           if (p.status === "connected") { toast("Google Drive connected"); done(); return; }
           setTimeout(poll, r.interval * 1000);
-        } catch (err) { toast(err.message); box.innerHTML = ""; }
+        } catch (err) { toast(err.message, "error"); box.innerHTML = ""; }
       };
       setTimeout(poll, r.interval * 1000);
-    } catch (err) { toast(err.message); btn.disabled = false; }
+    } catch (err) { toast(err.message, "error"); btn.disabled = false; }
   };
 }

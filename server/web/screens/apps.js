@@ -161,7 +161,7 @@ export async function appsScreen(view) {
           await api(`/api/apps/${encodeURIComponent(app.name)}/group`, { method: "PUT", body: { group: g } });
           app.group = g || null;
           toast(g ? `Moved to ${g}` : "Removed from group");
-        } catch (err) { toast(err.message); }
+        } catch (err) { toast(err.message, "error"); }
         render();
       };
       menu.querySelectorAll("[data-g]").forEach((b) => (b.onclick = () => setGroup(b.dataset.g)));
@@ -181,7 +181,7 @@ export async function appsScreen(view) {
         const rest = apps.filter((a) => !order.includes(a.name)).sort(SORTS.custom[1]).map((a) => a.name);
         const names = [...order, ...rest];
         names.forEach((n, i) => { const a = apps.find((x) => x.name === n); if (a) a.sortOrder = i; });
-        try { await api("/api/apps/order", { method: "PUT", body: { names } }); } catch (err) { toast(err.message); }
+        try { await api("/api/apps/order", { method: "PUT", body: { names } }); } catch (err) { toast(err.message, "error"); }
         render();
       });
       r.addEventListener("dragover", (e) => {

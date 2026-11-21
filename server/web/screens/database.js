@@ -4,6 +4,7 @@
 // With one: a viewer (tables on the left; rows, structure or a SQL box on the right),
 // how to connect, and deleting it. The server side is services/database.
 import { api, esc, icon, toast, bytes } from "../app.js";
+import { ask } from "../dialog.js";
 import { field, wireFields, removeServiceBox } from "./app.js";
 import { codeEditor } from "../editor.js";
 
@@ -114,7 +115,7 @@ export async function databasePage(box, base, app) {
     cm.focus(); cm.setCursor(cm.lineCount(), 0);
     const run = async () => {
       const sql = cm.getSelection() || cm.getValue();
-      if (!isReadOnly(sql) && !confirm(`This can change or delete data in ${app.displayName}'s database:\n\n${sql.trim().slice(0, 300)}\n\nRun it?`)) return;
+      if (!isReadOnly(sql) && !(await ask({ title: "Run this change?", text: `It can change or delete data in ${app.displayName}'s database:\n\n${sql.trim().slice(0, 300)}`, ok: "Run it", danger: true }))) return;
       const out = main.querySelector("#result"), b = main.querySelector("#run");
       b.disabled = true; out.innerHTML = `<div class="fb-loading"><span class="spinner"></span></div>`;
       try {
@@ -206,7 +207,7 @@ function chooser(box, base) {
       toast(`${TYPES[b.dataset.type].label} database created`);
       dispatchEvent(new HashChangeEvent("hashchange"));
     } catch (err) {
-      toast(err.message);
+      toast(err.message, "error");
       box.querySelectorAll("[data-type]").forEach((x) => (x.disabled = false));
       b.innerHTML = `${icon("plus")} Create ${TYPES[b.dataset.type].label}`;
     }

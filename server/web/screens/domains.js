@@ -8,6 +8,7 @@
 // While a domain waits for DNS, the table checks again every 15 seconds. Only the table
 // redraws, so what you're typing in the "Add" box stays.
 import { api, esc, icon, toast } from "../app.js";
+import { ask } from "../dialog.js";
 import { dnsHelp, wireCopy } from "./dns.js";
 
 const RECHECK = 15; // seconds
@@ -134,17 +135,17 @@ export async function domainsPage(box, base, app) {
         toast("Free address is on again");
       }
       if (action === "delete" && id === "free") {
-        if (!d.custom.length) { btn.disabled = false; return toast("Add a domain of your own first, so the app still has an address."); }
-        if (!confirm(`Turn off ${d.free.host}?\n\nThe app will only be reachable on your own domains. You can turn it back on any time.`)) { btn.disabled = false; return; }
+        if (!d.custom.length) { btn.disabled = false; return toast("Add a domain of your own first, so the app still has an address.", "error"); }
+        if (!(await ask({ title: `Turn off ${d.free.host}?`, text: "The app will only be reachable on your own domains. You can turn it back on any time.", ok: "Turn off" }))) { btn.disabled = false; return; }
         await api(`${base}/free-address`, { method: "PUT", body: { on: false } });
         toast("Free address turned off");
       }
       if (action === "delete" && id !== "free") {
-        if (!confirm(`Remove ${id}?\n\nVisitors on that address won't reach this app anymore. You can add it again later.`)) { btn.disabled = false; return; }
+        if (!(await ask({ title: `Remove ${id}?`, text: "Visitors on that address won't reach this app anymore. You can add it again later.", ok: "Remove", danger: true }))) { btn.disabled = false; return; }
         await api(`${base}/domains/${encodeURIComponent(id)}`, { method: "DELETE" });
         toast("Removed");
       }
-    } catch (err) { btn.disabled = false; return toast(err.message); }
+    } catch (err) { btn.disabled = false; return toast(err.message, "error"); }
     await refresh();
   }
 
@@ -160,7 +161,7 @@ export async function domainsPage(box, base, app) {
       await api(`${base}/domains/${encodeURIComponent(id)}`, { method: "PUT", body: { host: value } });
       toast("Domain changed");
       openHelp.add(value);
-    } catch (err) { return toast(err.message); }
+    } catch (err) { return toast(err.message, "error"); }
     editing = null;
     await refresh();
   }
@@ -215,7 +216,7 @@ export async function domainsPage(box, base, app) {
       }
       toast(hosts.length > 1 ? "Domains added" : "Domain added");
       add.reset(); add.querySelector(".domwww").hidden = true;
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
     btn.disabled = false;
     await refresh();
   };

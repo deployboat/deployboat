@@ -19,9 +19,14 @@ export function openMenu(anchor, fill, { align = "left" } = {}) {
 
   const onKey = (e) => { if (e.key === "Escape") close(); };
   const onOutside = (e) => { if (!el.contains(e.target) && !anchor.contains(e.target)) close(); };
-  // Scrolling the page closes it. Not when scrolling inside the menu, or while typing in it
-  // (on phones the keyboard opening scrolls the page).
-  const onScroll = (e) => { if (!el.contains(e.target) && !el.contains(document.activeElement)) close(); };
+  // Scrolling closes it, but only when it moves the button the menu hangs from (the page,
+  // or a box around the button). Not when scrolling inside the menu, while typing in it (on
+  // phones the keyboard opening scrolls the page), or when something else scrolls by itself
+  // (like a live log adding lines).
+  const onScroll = (e) => {
+    if (el.contains(e.target) || el.contains(document.activeElement)) return;
+    if (e.target === document || e.target.contains?.(anchor)) close();
+  };
   function close() {
     el.remove();
     anchor.classList.remove("open");

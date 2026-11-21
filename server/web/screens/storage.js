@@ -6,6 +6,7 @@
 //
 // Every file is public at <public URL>/<name>, so links and image previews use that address.
 import { api, esc, icon, toast, copy, bytes, timeAgo } from "../app.js";
+import { ask, askText } from "../dialog.js";
 import { field, wireFields, removeServiceBox } from "./app.js";
 
 const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg|ico)$/i;
@@ -78,7 +79,7 @@ export async function storagePage(box, base, app, addServicePage) {
       prefix = p; next = r.next;
       entries = more ? { folders: entries.folders.concat(r.folders), files: entries.files.concat(r.files) } : r;
       draw();
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
     list.classList.remove("busy");
   }
 
@@ -125,11 +126,12 @@ export async function storagePage(box, base, app, addServicePage) {
 
   async function remove(key) {
     const folder = key.endsWith("/");
-    if (!confirm(`Delete ${folder ? `the folder "${nameOf(key)}" and every file in it` : `"${nameOf(key)}"`}?\n\nLinks to ${folder ? "these files" : "it"} stop working. This can't be undone (unless it's in a backup).`)) return;
+    if (!(await ask({ title: `Delete ${folder ? `the folder "${nameOf(key)}"` : `"${nameOf(key)}"`}?`, ok: "Delete", danger: true,
+      text: `${folder ? "Every file in it is deleted. " : ""}Links to ${folder ? "these files" : "it"} stop working. This can't be undone (unless it's in a backup).` }))) return;
     try {
       const r = await api(`${base}/storage/files?key=${encodeURIComponent(key)}`, { method: "DELETE" });
       toast(folder ? `Deleted ${r.deleted} file${r.deleted === 1 ? "" : "s"}` : "Deleted");
-    } catch (err) { return toast(err.message); }
+    } catch (err) { return toast(err.message, "error"); }
     load(); refreshStats();
   }
 
@@ -145,7 +147,7 @@ export async function storagePage(box, base, app, addServicePage) {
       }).catch(() => null);
       if (!res?.ok) {
         bar.hidden = true;
-        toast((await res?.json().catch(() => null))?.error ?? `Couldn't upload ${file.name}.`);
+        toast((await res?.json().catch(() => null))?.error ?? `Couldn't upload ${file.name}.`, "error");
         return load();
       }
       done++;
@@ -157,8 +159,8 @@ export async function storagePage(box, base, app, addServicePage) {
   box.querySelector("#up").onchange = (e) => { upload([...e.target.files]); e.target.value = ""; };
 
   // S3 has no empty folders: a new folder exists once a file is in it. So "New folder" just opens it.
-  box.querySelector("#newdir").onclick = () => {
-    const name = prompt("Folder name")?.trim().replace(/^\/+|\/+$/g, "");
+  box.querySelector("#newdir").onclick = async () => {
+    const name = (await askText({ title: "New folder", label: "Folder name", placeholder: "avatars", ok: "Open folder" }))?.replace(/^\/+|\/+$/g, "");
     if (!name) return;
     prefix += name + "/";
     entries = { folders: [], files: [] }; next = null;

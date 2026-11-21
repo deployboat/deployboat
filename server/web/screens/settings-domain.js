@@ -1,5 +1,6 @@
 // Settings → Domain: *.example.com for every app, and (optionally) a separate dashboard address.
 import { api, esc, toast } from "../app.js";
+import { ask } from "../dialog.js";
 import { dnsHelp, recordBox, wireCopy } from "./dns.js";
 
 export async function domainPage(view) {
@@ -54,19 +55,19 @@ async function domainSection(el, pending) {
       const r = await api("/api/settings/domain", { method: "PUT", body });
       if (!r.saved) { toast("Not saved yet: DNS needs a change. See below."); return domainSection(el, { ...body, checks: r.checks }); }
       toast("Saved. HTTPS for the new addresses is set up on the first visit.");
-      if (r.dashboardHost !== location.host && confirm(`Saved. Open the dashboard at https://${r.dashboardHost} now?\n\nYou'll log in once more there, with the same token.`)) {
+      if (r.dashboardHost !== location.host && await ask({ title: "Open the dashboard at its new address?", text: `https://${r.dashboardHost}\n\nYou'll log in once more there, with the same token.`, ok: "Open it", cancel: "Stay here" })) {
         location.href = `https://${r.dashboardHost}/`;
         return;
       }
       domainSection(el);
-    } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Check DNS & save"; }
+    } catch (err) { toast(err.message, "error"); btn.disabled = false; btn.textContent = "Check DNS & save"; }
   };
   f.onsubmit = (e) => { e.preventDefault(); save(false); };
-  el.querySelector("#force")?.addEventListener("click", () => {
-    if (confirm("Save even though DNS isn't right yet?\n\nThe new addresses won't work until it is. The free addresses keep working.")) save(true);
+  el.querySelector("#force")?.addEventListener("click", async () => {
+    if (await ask({ title: "Save even though DNS isn't right yet?", text: "The new addresses won't work until it is. The free addresses keep working.", ok: "Save anyway" })) save(true);
   });
   el.querySelector("#domoff")?.addEventListener("click", async () => {
-    if (!confirm(`Go back to the free addresses (…${d.nipDomain})?\n\nApp addresses under ${d.base} stop working. Apps' own domains (like myshop.com) are not affected.`)) return;
+    if (!(await ask({ title: "Go back to the free addresses?", text: `Addresses under ${d.base} stop working, and apps use …${d.nipDomain} again. Apps' own domains (like myshop.com) are not affected.`, ok: "Go back", danger: true }))) return;
     await api("/api/settings/domain", { method: "PUT", body: { base: "", dashboard: "" } });
     toast("Back to the free addresses");
     if (location.host !== d.nipDashboard) location.href = `https://${d.nipDashboard}/#/settings/domain`;

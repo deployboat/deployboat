@@ -1,5 +1,6 @@
 // Settings → Alerts: where alerts go (destinations), and which things to alert about.
 import { api, esc, icon, toast } from "../app.js";
+import { ask } from "../dialog.js";
 
 // Every kind of destination: name, icon, and a hint on where to find what we ask for.
 const TYPES = {
@@ -64,12 +65,12 @@ export async function alertsPage(view) {
   view.querySelectorAll("[data-test]").forEach((b) => (b.onclick = async () => {
     b.disabled = true; b.textContent = "Sending…";
     try { await api(`/api/alerts/channels/${b.dataset.test}/test`, { method: "POST" }); toast("Test sent"); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
     b.disabled = false; b.textContent = "Send test";
   }));
 
   view.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
-    if (!confirm("Remove this destination? Alerts stop going there.")) return;
+    if (!(await ask({ title: "Remove this destination?", text: "Alerts stop going there.", ok: "Remove", danger: true }))) return;
     await api(`/api/alerts/channels/${b.dataset.del}`, { method: "DELETE" });
     toast("Removed");
     alertsPage(view);
@@ -79,7 +80,7 @@ export async function alertsPage(view) {
     try {
       await api("/api/alerts/events", { method: "PUT", body: { [cb.dataset.ev]: cb.checked } });
       toast(cb.checked ? "Turned on" : "Turned off");
-    } catch (err) { toast(err.message); cb.checked = !cb.checked; }
+    } catch (err) { toast(err.message, "error"); cb.checked = !cb.checked; }
   }));
 }
 
@@ -137,7 +138,7 @@ function addForm(box, done) {
         const r = await api("/api/alerts/telegram/find-chat", { method: "POST", body: { token: f.token.value } });
         f.chatId.value = r.chatId;
         toast(`Found: ${r.name || r.chatId}`);
-      } catch (err) { toast(err.message); }
+      } catch (err) { toast(err.message, "error"); }
     });
     f.onsubmit = async (e) => {
       e.preventDefault();
@@ -146,7 +147,7 @@ function addForm(box, done) {
         await api("/api/alerts/channels", { method: "POST", body: { type, ...Object.fromEntries(new FormData(f)) } });
         toast("Test sent and saved");
         done();
-      } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Send test & save"; }
+      } catch (err) { toast(err.message, "error"); btn.disabled = false; btn.textContent = "Send test & save"; }
     };
   };
   draw();

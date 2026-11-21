@@ -4,6 +4,7 @@
 // "New job" opens a form: what to run, when, and a time limit. The schedule is shown in
 // words as you pick it. The server side is crons/index.ts and api/crons.ts.
 import { api, esc, icon, toast, timeAgo } from "../app.js";
+import { ask } from "../dialog.js";
 import { openMenu } from "../menu.js";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -130,7 +131,7 @@ export async function crons(box, base, app) {
   async function runNow(b) {
     b.disabled = true;
     try { await api(`${base}/crons/${b.dataset.run}/run`, { method: "POST" }); toast("Started"); openHistory.add(Number(b.dataset.run)); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
     setTimeout(refresh, 800);
   }
 
@@ -150,12 +151,12 @@ export async function crons(box, base, app) {
         if (a === "copy") return form(box, base, app, { ...job, id: null, name: `${job.name} (copy)` }, refresh);
         if (a === "history") { openHistory.has(job.id) ? openHistory.delete(job.id) : openHistory.add(job.id); return draw(); }
         if (a === "toggle") {
-          await api(`${base}/crons/${job.id}/toggle`, { method: "POST" }).catch((err) => toast(err.message));
+          await api(`${base}/crons/${job.id}/toggle`, { method: "POST" }).catch((err) => toast(err.message, "error"));
           toast(job.enabled ? "Paused" : "Resumed");
         }
         if (a === "delete") {
-          if (!confirm(`Delete "${job.name}" and its history?`)) return;
-          await api(`${base}/crons/${job.id}`, { method: "DELETE" }).catch((err) => toast(err.message));
+          if (!(await ask({ title: `Delete "${job.name}"?`, text: "Its run history goes too.", ok: "Delete job", danger: true }))) return;
+          await api(`${base}/crons/${job.id}`, { method: "DELETE" }).catch((err) => toast(err.message, "error"));
           toast("Deleted");
         }
         refresh();
@@ -288,6 +289,6 @@ function form(box, base, app, job, done) {
       await api(editing ? `${base}/crons/${job.id}` : `${base}/crons`, { method: editing ? "PUT" : "POST", body });
       toast(editing ? "Saved" : "Job created");
       fb.innerHTML = ""; done();
-    } catch (err) { toast(err.message); btn.disabled = false; }
+    } catch (err) { toast(err.message, "error"); btn.disabled = false; }
   };
 }

@@ -3,6 +3,7 @@ import { loginScreen } from "./screens/login.js";
 import { appsScreen } from "./screens/apps.js";
 import { appScreen, SECTIONS } from "./screens/app.js";
 import { settingsScreen } from "./screens/settings.js";
+import { watchSelects } from "./select.js";
 import { serverScreen } from "./screens/server.js";
 import { doctorScreen } from "./screens/doctor.js";
 import { processesScreen } from "./screens/processes.js";
@@ -29,10 +30,15 @@ export async function api(path, { method = "GET", body } = {}) {
   return data;
 }
 
-export function toast(msg) {
+// A short message at the bottom of the screen. toast("Saved"), or toast(err.message, "error").
+// Errors stay longer and can be closed; there's time to read them.
+export function toast(msg, kind = "ok") {
   const t = document.getElementById("toast");
-  t.textContent = msg; t.hidden = false;
-  clearTimeout(t.timer); t.timer = setTimeout(() => (t.hidden = true), 2200);
+  t.className = `toast ${kind}`;
+  t.innerHTML = `${icon(kind === "error" ? "alert" : "check")}<span>${esc(msg)}</span>${kind === "error" ? `<button title="Close">${icon("x")}</button>` : ""}`;
+  t.querySelector("button")?.addEventListener("click", () => (t.hidden = true));
+  t.hidden = false;
+  clearTimeout(t.timer); t.timer = setTimeout(() => (t.hidden = true), kind === "error" ? 7000 : 2500);
 }
 
 export function bytes(n) {
@@ -209,4 +215,5 @@ function drawVersion() {
 
 document.getElementById("logout").onclick = async () => { await api("/auth/logout", { method: "POST" }); showLogin(); };
 window.addEventListener("hashchange", render);
+watchSelects(); // our own select boxes everywhere (see select.js)
 render();

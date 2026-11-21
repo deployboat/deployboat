@@ -83,19 +83,19 @@ export async function doctorScreen(view) {
 
     view.querySelector("#recheck").onclick = async (e) => {
       e.currentTarget.disabled = true; e.currentTarget.innerHTML = `<span class="spinner sm"></span> Checking…`;
-      await api("/api/doctor/check", { method: "POST" }).catch((err) => toast(err.message));
+      await api("/api/doctor/check", { method: "POST" }).catch((err) => toast(err.message, "error"));
       reload();
     };
     view.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => { open[b.dataset.open] = !open[b.dataset.open]; draw(); }));
     view.querySelectorAll("[data-fix]").forEach((b) => (b.onclick = () => askFix(b.dataset.fix)));
     view.querySelectorAll("[data-one]").forEach((b) => (b.onclick = async () => {
       b.disabled = true; b.textContent = "Checking…";
-      try { data = await api(`/api/doctor/check?id=${encodeURIComponent(b.dataset.one)}`, { method: "POST" }); } catch (err) { toast(err.message); }
+      try { data = await api(`/api/doctor/check?id=${encodeURIComponent(b.dataset.one)}`, { method: "POST" }); } catch (err) { toast(err.message, "error"); }
       draw();
     }));
     view.querySelectorAll("[data-every]").forEach((sel) => (sel.onchange = async () => {
       try { data = await api(`/api/doctor/every/${encodeURIComponent(sel.dataset.every)}`, { method: "PUT", body: { every: sel.value } }); toast(`Now ${EVERY[sel.value]}`); }
-      catch (err) { toast(err.message); }
+      catch (err) { toast(err.message, "error"); }
     }));
     view.querySelectorAll("[data-cancel]").forEach((b) => (b.onclick = () => { open.fix = null; draw(); }));
     view.querySelectorAll("[data-run]").forEach((b) => (b.onclick = () => runFix()));
@@ -167,7 +167,7 @@ export async function doctorScreen(view) {
     try {
       const d = await api(`/api/doctor/fix/${id}`);
       open.fix = { id, state: "confirm", label: d.label, description: d.description };
-    } catch (err) { toast(err.message); open.fix = null; }
+    } catch (err) { toast(err.message, "error"); open.fix = null; }
     draw();
   }
 
@@ -177,7 +177,7 @@ export async function doctorScreen(view) {
       await api(`/api/doctor/fix/${f.id}`, { method: "POST" });
       const h = await api("/api/doctor/history").catch(() => []);
       f.logId = h[0]?.id; f.state = "running";
-    } catch (err) { toast(err.message); open.fix = null; }
+    } catch (err) { toast(err.message, "error"); open.fix = null; }
     reload();
   }
 

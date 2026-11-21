@@ -1,5 +1,6 @@
 // One app. The sidebar picks the section; each section is a small function below.
 import { api, esc, timeAgo, statusOf, icon, toast, copy } from "../app.js";
+import { ask, askTyped } from "../dialog.js";
 import { shareCard } from "./share.js";
 import { crons } from "./crons.js";
 import { lineChart, uptimeStrip } from "../chart.js";
@@ -84,15 +85,16 @@ function headerActions(view, base, app) {
   view.querySelector("#restart").onclick = async (e) => {
     const b = e.currentTarget; b.disabled = true;
     try { await api(`${base}/restart`, { method: "POST" }); toast("Restarted"); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
     b.disabled = false;
   };
   view.querySelector("#toggle").onclick = async (e) => {
     const action = app.stopped ? "start" : "stop";
-    if (action === "stop" && !confirm(`Stop ${app.name}? The site goes offline until you start it again.`)) return;
-    const b = e.currentTarget; b.disabled = true;
+    const b = e.currentTarget;
+    if (action === "stop" && !(await ask({ title: `Stop ${app.displayName}?`, text: "The site goes offline until you start it again.", ok: "Stop", danger: true }))) return;
+    b.disabled = true;
     try { await api(`${base}/${action}`, { method: "POST" }); toast(action === "stop" ? "Stopped" : "Started"); redraw(); }
-    catch (err) { toast(err.message); b.disabled = false; }
+    catch (err) { toast(err.message, "error"); b.disabled = false; }
   };
 }
 
@@ -129,7 +131,7 @@ function overview(box, base, app) {
       await api(`/api/git/redeploy/${encodeURIComponent(app.name)}`, { method: "POST" });
       toast("Deploy started");
       location.hash = `#/apps/${encodeURIComponent(app.name)}/versions`;
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   });
 }
 
@@ -171,7 +173,7 @@ function persistentFolders(el, base, app) {
       try {
         const r = await api(`${base}/folders`, { method: "PUT", body: { folders: [...f.querySelectorAll("[name=f]")].map((i) => i.value) } });
         folders = r.folders; toast("Saved. The app restarted with the new folders."); show();
-      } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Save & restart"; }
+      } catch (err) { toast(err.message, "error"); btn.disabled = false; btn.textContent = "Save & restart"; }
     };
   };
   show();
@@ -241,13 +243,13 @@ function wireAutoDeploy(box, base, app) {
   if (!app.git || app.git.isPreview) return;
   const save = async (body, msg) => {
     try { const r = await api(`${base}/git`, { method: "PUT", body }); toast(msg); return r.git; }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
   };
   box.querySelector("#auto").onchange = (e) => save({ autoDeploy: e.target.checked }, e.target.checked ? "Auto-deploy on" : "Auto-deploy off");
   box.querySelector("#prev").onchange = (e) => save({ previews: e.target.checked }, e.target.checked ? "Previews on" : "Previews off");
   box.querySelector("#cphook").onclick = () => copy(box.querySelector("#hookurl").value);
   box.querySelector("#resethook").onclick = async () => {
-    if (!confirm("Make a new webhook address? The old one stops working, so update it in your repo settings.")) return;
+    if (!(await ask({ title: "Make a new webhook address?", text: "The old one stops working, so update it in your repo settings.", ok: "Make new address" }))) return;
     const g = await save({ resetSecret: true }, "New address created");
     if (g) box.querySelector("#hookurl").value = g.webhookUrl;
   };
@@ -275,12 +277,12 @@ function settings(box, base, app) {
       await api(`${base}/display-name`, { method: "PUT", body: { displayName: form.displayName.value } });
       toast("Saved");
       dispatchEvent(new HashChangeEvent("hashchange"));
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   };
   box.querySelector("#delete").onclick = async () => {
-    if (!confirm(`Delete ${app.displayName}? The site goes offline. Its database and files are kept.`)) return;
+    if (!(await askTyped({ title: `Delete ${app.displayName}?`, text: "The site goes offline and its versions are removed. Its database and files are kept.", word: app.name, ok: "Delete app" }))) return;
     try { await api(base, { method: "DELETE" }); toast("Deleted"); location.hash = "#/"; }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
   };
 }
 
@@ -299,12 +301,12 @@ export function removeServiceBox(box, base, app, service) {
     <button class="btn danger">${icon("trash")} Delete ${db ? "database" : "storage"}</button>`;
   box.append(el);
   el.querySelector("button").onclick = async (e) => {
-    const typed = prompt(`This deletes ${app.displayName}'s ${db ? "database" : "stored files"}.\n\nType the app address name (${app.name}) to confirm:`);
-    if (typed !== app.name) { if (typed !== null) toast("Name didn't match. Nothing deleted."); return; }
     const b = e.currentTarget;
+    if (!(await askTyped({ title: `Delete ${app.displayName}'s ${db ? "database" : "storage"}?`, word: app.name, ok: `Delete ${db ? "database" : "storage"}`,
+      text: `Every ${db ? "table and row" : "stored file"} is deleted. A backup is made first, so you can restore it from Backups.` }))) return;
     b.disabled = true;
     try { await api(`${base}/services/${service}`, { method: "DELETE" }); }
-    catch (err) { toast(err.message); b.disabled = false; return; }
+    catch (err) { toast(err.message, "error"); b.disabled = false; return; }
     followRemoval(el, base, service, b);
   };
 }
@@ -324,7 +326,7 @@ function followRemoval(el, base, service, button) {
     status.classList.toggle("bad", !!r.error);
     if (!r.done) return;
     clearInterval(timer);
-    if (r.error) return toast(`The ${label} wasn't deleted.`);
+    if (r.error) return toast(`The ${label} wasn't deleted.`, "error");
     toast(`${label === "database" ? "Database" : "Storage"} deleted. The backup is on the Backups page.`);
     dispatchEvent(new HashChangeEvent("hashchange"));
   }, 1500);
@@ -351,7 +353,7 @@ function addServicePage(box, base, service) {
     b.disabled = true; b.innerHTML = `<span class="spinner" style="width:14px;height:14px"></span> Adding…`;
     try { await api(`${base}/services/${service}`, { method: "POST" }); toast("Added"); dispatchEvent(new HashChangeEvent("hashchange")); }
     catch (err) {
-      toast(err.message); b.disabled = false; b.textContent = t.button;
+      toast(err.message, "error"); b.disabled = false; b.textContent = t.button;
     }
   };
 }

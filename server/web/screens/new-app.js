@@ -40,7 +40,7 @@ function tokenStep(pane, defaultName, ready) {
   pane.querySelector("#mk").onsubmit = async (e) => {
     e.preventDefault();
     try { const r = await api("/api/tokens", { method: "POST", body: { name: e.target.name.value } }); ready(r.token); }
-    catch (err) { toast(err.message); }
+    catch (err) { toast(err.message, "error"); }
   };
 }
 
@@ -152,6 +152,6 @@ function git(pane, close) {
       toast("Deploy started");
       close();
       location.hash = `#/apps/${encodeURIComponent(r.name)}/versions`;
-    } catch (err) { toast(err.message); btn.disabled = false; }
+    } catch (err) { toast(err.message, "error"); btn.disabled = false; }
   };
 }

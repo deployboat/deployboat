@@ -1,5 +1,6 @@
 // System: machine info, usage meters, and every Docker container.
 import { api, esc, icon, toast, bytes } from "../app.js";
+import { ask } from "../dialog.js";
 import { lineChart } from "../chart.js";
 import { rangePicker } from "./ranges.js";
 
@@ -49,10 +50,10 @@ export async function serverScreen(page) {
       </div>`;
 
     view.querySelectorAll("[data-restart]").forEach((b) => (b.onclick = async () => {
-      if (!confirm(`Restart ${b.dataset.restart}?`)) return;
+      if (!(await ask({ title: `Restart ${b.dataset.restart}?`, text: "Apps that use it may be unavailable for a few seconds.", ok: "Restart" }))) return;
       b.disabled = true;
       try { await api(`/api/server/containers/${encodeURIComponent(b.dataset.restart)}/restart`, { method: "POST" }); toast("Restarted"); draw(); }
-      catch (err) { toast(err.message); b.disabled = false; }
+      catch (err) { toast(err.message, "error"); b.disabled = false; }
     }));
   }
   // Load both at the same time (faster), then show them.

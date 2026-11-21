@@ -1,6 +1,7 @@
 // The Share card on the app's Overview: who can see the app (public or password
 // protected), with a QR code and the links to send. "Change" opens a small form in the card.
 import { api, esc, icon, toast, copy } from "../app.js";
+import { ask } from "../dialog.js";
 
 export async function shareCard(el, base) {
   const s = await api(`${base}/share`);
@@ -30,7 +31,7 @@ export async function shareCard(el, base) {
   el.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = () => copy(b.dataset.copy)));
   el.querySelector("#change").onclick = () => accessForm(el.querySelector("#form"), base, s, () => shareCard(el, base));
   el.querySelector("#reset")?.addEventListener("click", async () => {
-    if (!confirm("Make a new private link? Anyone using the old one will need the password.")) return;
+    if (!(await ask({ title: "Make a new private link?", text: "Anyone using the old one will need the password.", ok: "Make new link" }))) return;
     await api(`${base}/share/reset-link`, { method: "POST" });
     toast("New link created"); shareCard(el, base);
   });
@@ -69,7 +70,7 @@ function accessForm(box, base, s, done) {
       await api(`${base}/share`, { method: "PUT", body: { mode: form.mode.value, username: form.username.value, password: form.password.value } });
       toast(form.mode.value === "password" ? "Now password protected" : "Now public");
       done();
-    } catch (err) { toast(err.message); }
+    } catch (err) { toast(err.message, "error"); }
   };
 }
 
