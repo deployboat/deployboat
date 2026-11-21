@@ -180,7 +180,8 @@ ol.steps { display: grid; gap: 14px; padding-left: 20px; }
 
 /* share */
 /* App → Overview: details on the left, Share on the right */
-.ovtop { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+.ovtop { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: stretch; } /* both boxes as tall as the taller one */
+.ovtop .sharecard { align-content: start; }
 .ovtop .info { grid-template-columns: 130px minmax(0, 1fr); }
 @media (max-width: 1000px) { .ovtop { grid-template-columns: minmax(0, 1fr); } }
 .sharecard { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
