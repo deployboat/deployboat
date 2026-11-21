@@ -1,4 +1,4 @@
-// Apps list: search, filter by status, sort, group, and drag to reorder (in Custom order).
+// Apps list: search, sort, group, and drag to reorder (in Custom order).
 // Statuses refresh every 5 seconds without losing what you're doing.
 import { api, esc, timeAgo, statusOf, icon, toast, copy } from "../app.js";
 import { openMenu, pickOne, isMenuOpen } from "../menu.js";
@@ -12,7 +12,6 @@ const SORTS = {
   custom: ["Custom order", (a, b) => (a.sortOrder ?? 1e9) - (b.sortOrder ?? 1e9) || cmpDate(b.createdAt, a.createdAt)],
 };
 const GROUPS = { none: "None", group: "Your groups", status: "Status" };
-const STATUSES = { all: "All", live: "Live", failed: "Failed", building: "Building", stopped: "Stopped" };
 const SERVICES = { database: ["db", "Database"], storage: ["folder", "Storage"] };
 const cmpDate = (a, b) => (a ?? "").localeCompare(b ?? "");
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
@@ -25,16 +24,15 @@ const save = (p) => { try { localStorage.setItem(PREFS, JSON.stringify(p)); } ca
 
 export async function appsScreen(view) {
   const prefs = load();
-  let apps = [], search = "", status = "all", timer, dragging = false;
+  let apps = [], search = "", timer, dragging = false;
 
   view.innerHTML = `
     <div class="row spread head">
-      <div><h1>Apps</h1><p class="muted" id="summary"></p></div>
+      <h1>Apps</h1>
       <button class="btn primary" id="new">${icon("plus")} New app</button>
     </div>
     <div class="toolbar" id="toolbar">
       <div class="search">${icon("search")}<input id="search" placeholder="Search apps" autocomplete="off"></div>
-      <div class="chips" id="chips"></div>
       <span class="grow"></span>
       <button class="btn select" id="sort"></button>
       <button class="btn select" id="groupBy"></button>
@@ -47,10 +45,6 @@ export async function appsScreen(view) {
     (v) => { prefs.sort = v; save(prefs); render(); }, { title: "Sort by" });
   view.querySelector("#groupBy").onclick = (e) => pickOne(e.currentTarget, Object.entries(GROUPS), prefs.groupBy,
     (v) => { prefs.groupBy = v; save(prefs); render(); }, { title: "Group by" });
-  view.querySelector("#chips").onclick = (e) => {
-    const b = e.target.closest("[data-status]");
-    if (b) { status = b.dataset.status; render(); }
-  };
 
   async function refresh() {
     apps = await api("/api/apps");
@@ -64,14 +58,13 @@ export async function appsScreen(view) {
     if (!main.length) { list.innerHTML = empty(); list.querySelector("#new2").onclick = openNewApp; return; }
 
     const shown = main
-      .filter((a) => status === "all" || statusOf(a) === status)
       .filter((a) => !search || `${a.displayName} ${a.name} ${a.url} ${a.group ?? ""}`.toLowerCase().includes(search))
       .sort(SORTS[prefs.sort][1]);
 
     if (!shown.length) {
-      list.innerHTML = `<div class="card pad muted nomatch">No apps match${search ? ` “${esc(search)}”` : ""}${status !== "all" ? ` with status ${STATUSES[status].toLowerCase()}` : ""}.
+      list.innerHTML = `<div class="card pad muted nomatch">No apps match “${esc(search)}”.
         <button class="linkbtn" id="clear">Show all apps</button></div>`;
-      list.querySelector("#clear").onclick = () => { search = ""; status = "all"; view.querySelector("#search").value = ""; render(); };
+      list.querySelector("#clear").onclick = () => { search = ""; view.querySelector("#search").value = ""; render(); };
       return;
     }
 
@@ -102,27 +95,18 @@ export async function appsScreen(view) {
       e.preventDefault(); e.stopPropagation(); // the row is a link: don't open the app
       rowMenu(b, apps.find((a) => a.name === b.dataset.menu));
     }));
-    if (prefs.sort === "custom" && !search && status === "all") dragAndDrop(list);
+    if (prefs.sort === "custom" && !search) dragAndDrop(list);
   }
 
-  // Summary line, status chips with counts, and the two dropdown buttons.
+  // The Sort and Group dropdown buttons. The toolbar hides while there are no apps.
   function drawToolbar(main) {
-    const count = (s) => main.filter((a) => statusOf(a) === s).length;
-    const problems = count("failed");
-    view.querySelector("#summary").innerHTML = !main.length ? "" :
-      `${main.length} ${main.length === 1 ? "app" : "apps"} · ${count("live")} live${problems ? ` · <span class="bad">${problems} failed</span>` : ""}`;
     view.querySelector("#toolbar").hidden = !main.length;
-    // Only show chips for statuses that exist (plus "All").
-    view.querySelector("#chips").innerHTML = Object.entries(STATUSES)
-      .filter(([k]) => k === "all" || count(k) || k === status)
-      .map(([k, l]) => `<button data-status="${k}" class="${k === status ? "on" : ""}">${k === "all" ? "" : `<span class="status ${k}"></span>`}${l}
-        <span class="count">${k === "all" ? main.length : count(k)}</span></button>`).join("");
     view.querySelector("#sort").innerHTML = `<span class="muted">Sort:</span> ${SORTS[prefs.sort][0]} ${icon("down")}`;
     view.querySelector("#groupBy").innerHTML = `<span class="muted">Group:</span> ${GROUPS[prefs.groupBy]} ${icon("down")}`;
   }
 
   function row(a) {
-    const s = statusOf(a), custom = prefs.sort === "custom" && !search && status === "all";
+    const s = statusOf(a), custom = prefs.sort === "custom" && !search;
     return `
       <a class="approw" href="#/apps/${encodeURIComponent(a.name)}" data-name="${esc(a.name)}" ${custom ? 'draggable="true"' : ""}>
         ${custom ? `<span class="handle" title="Drag to reorder">⋮⋮</span>` : ""}
