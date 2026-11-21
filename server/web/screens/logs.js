@@ -237,7 +237,7 @@ function deploysTab(el, base, app) {
 }
 
 // Build log lines: steps ("→ …") stand out, failures are red.
-const buildLevel = (t) => /^\s*(→|==>|#\d+ \[)/.test(t) ? "step"
+export const buildLevel = (t) => /^\s*(→|==>|#\d+ \[)/.test(t) ? "step"
   : /\b(error|failed|fatal|exited with code [1-9])\b/i.test(t) ? "error"
   : /\bwarn(ing)?\b/i.test(t) ? "warn" : "info";
 

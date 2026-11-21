@@ -744,3 +744,165 @@ a.stname:hover { color: var(--accent); }
 /* Deleting a database or storage: the steps, as they happen */
 .removal { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--warn); }
 .removal.bad { color: var(--bad); }
+
+/* App → Crons: the jobs table */
+.cronintro { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.cronintro p { font-size: 13.5px; max-width: 620px; }
+.crontable { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) auto; overflow: hidden; }
+.cronhead, .cronrow { display: contents; }
+.cronhead span { padding: 9px 14px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.cronhead span:first-child { padding-left: 18px; }
+.croncell { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 12px 14px; border-bottom: 1px solid var(--line); min-width: 0; font-size: 13.5px; cursor: pointer; }
+.cronrow:hover > .croncell, .cronrow.open > .croncell { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+.cronrow.paused .croncell:not(.cronacts) { opacity: .6; }
+.cronjob { flex-direction: row; align-items: center; gap: 12px; padding-left: 18px; }
+.cronjob .grow { min-width: 0; }
+.cronjob b { font-weight: 600; }
+.crontarget { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cronicon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--soft); color: var(--accent); }
+.cronicon svg.i { width: 16px; height: 16px; }
+.cronicon.failed { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.cronicon.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.cronicon.paused { background: var(--bg); color: var(--muted); }
+.cronstrip { display: flex; gap: 3px; align-items: center; min-height: 14px; }
+.cronstrip i { width: 8px; height: 14px; border-radius: 2px; background: var(--c, var(--line)); }
+.cronstrip i.ok { --c: var(--ok); } .cronstrip i.bad { --c: var(--bad); } .cronstrip i.info { --c: var(--accent); } .cronstrip i.plain { --c: var(--muted); }
+.cronacts { flex-direction: row; align-items: center; justify-content: flex-end; gap: 4px; padding-right: 12px; cursor: default; }
+.cronacts .btn { white-space: nowrap; }
+.cronhistory { grid-column: 1 / -1; border-bottom: 1px solid var(--line); background: var(--bg); }
+.cronruns details { border-bottom: 1px solid var(--line); }
+.cronruns details:last-child { border-bottom: 0; }
+.cronruns summary { display: flex; align-items: center; gap: 12px; padding: 9px 18px 9px 62px; cursor: pointer; list-style: none; font-size: 13px; }
+.cronruns summary::-webkit-details-marker { display: none; }
+.cronruns .chev svg.i { width: 14px; height: 14px; color: var(--muted); transition: transform .15s; }
+.cronruns details[open] .chev svg.i { transform: rotate(90deg); }
+.cronruns .log { margin: 0 18px 12px 62px; max-height: 260px; }
+.cronempty { text-align: center; padding: 36px 20px; }
+.cronempty > svg.i { width: 28px; height: 28px; color: var(--muted); }
+.cronempty h3 { margin: 6px 0 2px; }
+.cronexamples { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 16px; text-align: left; }
+.cronexamples button { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; color: inherit; font: inherit; cursor: pointer; box-shadow: none; }
+.cronexamples button:hover { border-color: var(--accent); }
+.cronexamples svg.i { color: var(--accent); flex: none; margin-top: 2px; }
+.cronexamples .note { display: block; margin-top: 2px; }
+
+/* App → Crons: the form */
+.cronform { margin-bottom: 14px; }
+.cronform-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 12px 18px; border-bottom: 1px solid var(--line); }
+.cronstep { display: flex; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.cronstep > .grow { display: grid; gap: 10px; min-width: 0; }
+.cronstep label:not(.seg label) { display: grid; gap: 4px; font-size: 13px; font-weight: 500; }
+.stepnum { width: 24px; height: 24px; border-radius: 50%; background: var(--soft); color: var(--accent); display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; justify-self: start; background: var(--bg); }
+.seg label { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 7px; font-size: 13.5px; font-weight: 500; cursor: pointer; color: var(--muted); }
+.seg label.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px #0002; }
+.seg input { display: none; }
+.seg svg.i { width: 15px; height: 15px; }
+.prefixed { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
+.prefixed:focus-within { border-color: var(--accent); outline: 2px solid var(--soft); }
+.prefixed span { padding: 0 2px 0 12px; color: var(--muted); font: 13px var(--mono); white-space: nowrap; }
+.prefixed input { border: 0; outline: 0 !important; background: none; font-family: var(--mono); font-size: 13.5px; padding-left: 4px; }
+.cronwhen { gap: 10px; align-items: flex-end; }
+.cronwhen label { min-width: 130px; }
+.cronsummary { display: flex; align-items: center; gap: 6px; font-size: 13.5px; padding: 8px 12px; border-radius: 8px; background: var(--soft); flex-wrap: wrap; }
+.cronsummary svg.i { width: 15px; height: 15px; color: var(--accent); }
+.cronform-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; }
+@media (max-width: 800px) {
+  .crontable { grid-template-columns: minmax(0, 1fr) auto; }
+  .cronhead { display: none; }
+  .cronrow > .croncell:nth-child(2), .cronrow > .croncell:nth-child(3), .cronrow > .croncell:nth-child(4) { grid-column: 1 / -1; border-bottom: 0; padding-top: 0; padding-left: 62px; flex-direction: row; gap: 8px; align-items: center; }
+  .cronrow > .croncell:nth-child(4) { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .cronjob { border-bottom: 0; }
+  .cronacts { grid-column: 2; grid-row: auto; border-bottom: 0; }
+  .cronruns summary, .cronruns .log { padding-left: 18px; margin-left: 18px; }
+}
+.cronwhen label.grow { max-width: 320px; }
+
+/* App → Versions */
+.vnow { display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 14px; flex-wrap: wrap; }
+.vnow .grow { display: grid; gap: 1px; min-width: 0; }
+.vnow b { font-size: 16px; }
+.vnow-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--bg); color: var(--muted); flex: none; }
+.vnow-icon.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.vnow .pill { display: inline-flex; align-items: center; gap: 6px; }
+.vtable { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; overflow: hidden; }
+.vhead, .vrow { display: contents; }
+.vhead span { padding: 9px 14px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.vhead span:first-child { padding-left: 18px; }
+.vcell { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 11px 14px; border-bottom: 1px solid var(--line); min-width: 0; font-size: 13.5px; }
+.vcell:first-child { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding-left: 18px; }
+.vrow:hover > .vcell { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+.vrow.current > .vcell { background: color-mix(in srgb, var(--ok) 6%, transparent); }
+.vrow .pill { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; }
+.vsrc { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vsrc > svg.i { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.vsrc .grow { display: grid; min-width: 0; }
+.vcommit { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vcommit code { color: var(--accent); }
+.vacts { flex-direction: row; align-items: center; justify-content: flex-end; gap: 6px; padding-right: 12px; }
+.vacts .btn { white-space: nowrap; }
+.vlive { font-size: 13px; color: var(--ok); font-weight: 600; padding: 0 10px; min-width: 104px; text-align: center; }
+.vlog { grid-column: 1 / -1; padding: 10px 14px 14px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.vlog .logview { height: auto; min-height: 0; max-height: 380px; }
+@media (max-width: 800px) {
+  .vtable { grid-template-columns: auto minmax(0, 1fr); }
+  .vhead { display: none; }
+  .vrow > .vcell:nth-child(2) { border-bottom: 0; align-items: flex-end; }
+  .vrow > .vcell:first-child { border-bottom: 0; }
+  .vrow > .vcell:nth-child(3), .vrow > .vcell:nth-child(4) { grid-column: 1 / -1; border-bottom: 0; padding-top: 0; padding-left: 18px; }
+  .vrow > .vacts { grid-column: 1 / -1; justify-content: flex-start; padding-left: 12px; }
+}
+
+/* App → Variables */
+.varbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.varsearch { flex: 0 1 280px; min-width: 180px; }
+.vartable, .vargrid { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(0, 1.6fr) auto; overflow: hidden; }
+.vardetails { overflow: hidden; }
+.varhead, .varrow { display: contents; }
+.varhead span { padding: 9px 14px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.varhead span:first-child { padding-left: 18px; }
+.varcell { display: flex; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--line); min-width: 0; }
+.varcell:first-child { padding-left: 18px; }
+.varrow:hover > .varcell { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+.varkey { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.varrow.builtin .varkey { color: var(--muted); font-weight: 500; }
+.varval { font: 12.5px var(--mono); overflow-wrap: anywhere; white-space: pre-wrap; max-height: 7.5em; overflow: hidden; }
+.varval.hidden { color: var(--muted); letter-spacing: .1em; }
+.varval.blank { color: var(--muted); font-style: italic; font-family: inherit; font-size: 13px; letter-spacing: 0; }
+.varacts { gap: 2px; justify-content: flex-end; padding-right: 10px; }
+.varacts .danger:hover { color: var(--bad); }
+.varrow.editing > .varcell { background: var(--bg); align-items: flex-start; }
+.varrow.editing input, .varrow.editing textarea { font: 12.5px var(--mono); padding: 6px 10px; }
+.varrow.editing textarea { resize: vertical; }
+.varrow.editing .varacts { gap: 6px; }
+.varempty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 32px 16px; text-align: center; color: var(--muted); }
+.varempty svg.i { width: 24px; height: 24px; margin-bottom: 4px; }
+.varempty b { color: var(--ink); }
+.varcount { margin-top: 6px; }
+.vardetails { margin-top: 14px; }
+.vardetails summary { display: flex; align-items: center; gap: 8px; padding: 12px 18px; cursor: pointer; list-style: none; }
+.vardetails summary::-webkit-details-marker { display: none; }
+.vardetails summary svg.i { width: 15px; height: 15px; color: var(--muted); }
+.vardetails summary .note { margin-left: auto; }
+.vardetails .chev svg.i { transition: transform .15s; }
+.vardetails[open] .chev svg.i { transform: rotate(90deg); }
+.vardetails[open] summary { border-bottom: 1px solid var(--line); }
+.vargroup { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 10px; padding: 10px 18px 6px; background: var(--bg); border-bottom: 1px solid var(--line); font-size: 13px; }
+.varform { padding: 16px 18px; margin-bottom: 14px; display: grid; gap: 10px; }
+.varform-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.varform-row label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; min-width: 220px; }
+.varform input, .varform textarea { font: 13px var(--mono); }
+.varform textarea { resize: vertical; }
+.varform #hint svg.i { width: 14px; height: 14px; color: var(--warn); vertical-align: -2px; }
+.varform-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.varpreview { display: flex; flex-wrap: wrap; gap: 4px; }
+.varpreview span { font: 12px var(--mono); padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.varpreview span.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.varpreview span.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.note.bad { color: var(--bad); }
+@media (max-width: 700px) {
+  .vartable, .vargrid { grid-template-columns: minmax(0, 1fr) auto; }
+  .varhead { display: none; }
+  .varrow > .varcell:nth-child(2) { grid-column: 1 / -1; grid-row: auto; order: 3; padding-top: 0; padding-left: 18px; }
+  .varrow > .varcell:first-child { border-bottom: 0; }
+}

@@ -92,7 +92,7 @@ apps.get("/:name", async (c) => {
   const name = c.req.param("name");
   if (!exists(name)) return c.json({ error: "App not found." }, 404);
   const image = await currentImage(name);
-  const rows = db.prepare("SELECT id, status, image, created_at FROM deploys WHERE app = ? ORDER BY id DESC LIMIT 30").all(name) as (Deploy & { image: string | null })[];
+  const rows = db.prepare("SELECT id, status, image, created_at, finished_at, source, git_commit FROM deploys WHERE app = ? ORDER BY id DESC LIMIT 30").all(name) as (Deploy & { image: string | null })[];
   // Don't send image names to the browser; just say which one is running.
   const deploys = rows.map(({ image: img, ...d }) => ({ ...d, current: !!img && img === image, canActivate: !!img && d.status === "live" }));
   return c.json({
@@ -140,14 +140,25 @@ apps.get("/:name/env", (c) => {
 });
 
 // Save one variable, then restart so the app sees it.
+// Save variables, then restart once so the app sees them.
+// One: { key, value }. Several at once (pasting a .env file, renaming): { vars: { KEY: "value" }, remove: ["OLD"] }.
+const badKey = (key: string) =>
+  !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? `"${key}": names use letters, numbers and _ only, and can't start with a number.`
+  : isBuiltin(key) || key === "PORT" || key === "DATA_DIR" ? `${key} is managed by Deploy Boat.` : null;
+
 apps.put("/:name/env", async (c) => {
   const name = c.req.param("name");
-  const { key, value } = await c.req.json().catch(() => ({}));
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key ?? "")) return c.json({ error: "Name: letters, numbers and _ only. Can't start with a number." }, 400);
-  if (isBuiltin(key) || key === "PORT") return c.json({ error: `${key} is managed by Deploy Boat.` }, 400);
-  setEnv(name, key, String(value ?? ""));
+  const body = await c.req.json().catch(() => ({}));
+  const vars: Record<string, unknown> = body.vars && typeof body.vars === "object" ? body.vars : { [body.key ?? ""]: body.value };
+  const remove: string[] = Array.isArray(body.remove) ? body.remove.map(String) : [];
+  for (const key of [...Object.keys(vars), ...remove]) {
+    const problem = badKey(key);
+    if (problem) return c.json({ error: problem }, 400);
+  }
+  for (const key of remove) deleteEnv(name, key);
+  for (const [key, value] of Object.entries(vars)) setEnv(name, key, String(value ?? ""));
   await restart(name).catch(() => {}); // fine if never deployed yet
-  return c.json({ ok: true });
+  return c.json({ ok: true, saved: Object.keys(vars).length });
 });
 
 apps.delete("/:name/env/:key", async (c) => {

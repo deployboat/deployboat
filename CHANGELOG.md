@@ -19,6 +19,9 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 - **Pick your database: PostgreSQL, MySQL (MariaDB) or SQLite.** The Database page explains each one. Also from the CLI (`deployboat add mysql`, `--with sqlite`) and for AI agents.
 - **A database viewer.** Browse tables page by page, see their structure, and run any SQL (with a check before changes), with results you can download as CSV. It runs as the app's own database user, so it can't touch other apps.
 - **Deleting a database or storage no longer freezes the dashboard.** It runs in the background and shows each step. The backup made first only holds the part being deleted, so it's much quicker, and backups compress at low priority so the server stays responsive.
+- **A clearer Crons page.** Jobs in a table with their schedule in words, a strip of the last 10 runs, the next run and a Run button; click a row for its history and output. A step-by-step New job form with the full address or command, a live description of the schedule, a time zone picker, and example jobs to start from. Jobs can be duplicated.
+- **A clearer Versions page.** What's live now on top (with Pull & redeploy), then a table of versions: status, where each came from (Git push with its commit, CLI upload, redeploy), when and how long the build took, its log (colored, live while building) and Roll back. New deploys record their source, commit and build time.
+- **A clearer Variables page.** Your variables in a table with show/hide, copy, inline edit (rename too) and delete, plus search. Paste a whole .env file (with a preview of what's new or replaced) or download one. Names are cleaned up as you type, and several changes restart the app only once. Deploy Boat's own variables are grouped and folded away.
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0

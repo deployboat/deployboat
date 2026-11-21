@@ -13,24 +13,27 @@ export const appUrl = (name: string) => `https://${mainHost(name)}`;
 
 // `source` is a folder that's already there (CLI upload), or a function that
 // fetches the code first (Git). Either way, the log is saved as it happens.
+// `via` says where this version came from, for the Versions page.
 export async function deploy(
   name: string,
-  source: string | ((log: (l: string) => void) => Promise<string>),
+  source: string | ((log: (l: string) => void, setCommit: (c: string) => void) => Promise<string>),
   log: (l: string) => void = () => {},
   add: string[] = [],   // services to add on this deploy, e.g. ["database"], ["mysql", "storage"]
+  via = "Uploaded with the CLI",
 ): Promise<string> {
   db.prepare("INSERT OR IGNORE INTO apps (name) VALUES (?)").run(name);
-  const { lastInsertRowid: id } = db.prepare("INSERT INTO deploys (app, status) VALUES (?, 'building')").run(name);
+  const { lastInsertRowid: id } = db.prepare("INSERT INTO deploys (app, status, source) VALUES (?, 'building', ?)").run(name, via);
+  const setCommit = (c: string) => db.prepare("UPDATE deploys SET git_commit = ? WHERE id = ?").run(c, id);
 
   const lines: string[] = [];
   const saveLog = db.prepare("UPDATE deploys SET log = ? WHERE id = ?");
   const save = (l: string) => { lines.push(l); saveLog.run(lines.join("\n"), id); };
   const logAndSave = (l: string) => { save(l); log(l); };
   const finish = (status: string) =>
-    db.prepare("UPDATE deploys SET status = ?, log = ? WHERE id = ?").run(status, lines.join("\n"), id);
+    db.prepare("UPDATE deploys SET status = ?, log = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, lines.join("\n"), id);
 
   try {
-    const srcDir = typeof source === "string" ? source : await source(logAndSave);
+    const srcDir = typeof source === "string" ? source : await source(logAndSave, setCommit);
     const image = await build(name, srcDir, logAndSave);
     db.prepare("UPDATE deploys SET image = ? WHERE id = ?").run(image, id);
     for (const s of add) {

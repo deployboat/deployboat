@@ -8,8 +8,12 @@ export const crons = new Hono();
 const lastRun = (id: number) =>
   db.prepare("SELECT status, started_at, duration_ms FROM cron_runs WHERE cron_id = ? ORDER BY id DESC LIMIT 1").get(id) ?? null;
 
+// The last 10 results, oldest first, for the little history strip in the list.
+const recent = (id: number) =>
+  (db.prepare("SELECT status, started_at, duration_ms FROM cron_runs WHERE cron_id = ? ORDER BY id DESC LIMIT 10").all(id) as object[]).reverse();
+
 const view = (j: ReturnType<typeof getJob> & {}) => ({
-  ...j, enabled: !!j.enabled, nextRun: nextRun(j.id), running: isRunning(j.id), lastRun: lastRun(j.id),
+  ...j, enabled: !!j.enabled, nextRun: nextRun(j.id), running: isRunning(j.id), lastRun: lastRun(j.id), recent: recent(j.id),
 });
 
 // Check and clean what the dashboard sends. Returns an error message or the clean values.

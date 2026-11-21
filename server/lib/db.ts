@@ -23,6 +23,11 @@ db.exec(`
 
 // Added later: which Docker image each deploy produced (for rollback).
 try { db.exec("ALTER TABLE deploys ADD COLUMN image TEXT"); } catch { /* already there */ }
+// Added later: where a version came from ("Push to main: a1b2c3d…", "Uploaded with the CLI"),
+// its Git commit ("a1b2c3d Fix login") and when the build ended (for how long it took).
+for (const col of ["source TEXT", "git_commit TEXT", "finished_at TEXT"]) {
+  try { db.exec(`ALTER TABLE deploys ADD COLUMN ${col}`); } catch { /* already there */ }
+}
 
 // Old app names → current name, so `deployboat deploy` keeps working after a rename.
 db.exec("CREATE TABLE IF NOT EXISTS aliases (old TEXT PRIMARY KEY, name TEXT NOT NULL)");

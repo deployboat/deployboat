@@ -108,7 +108,7 @@ async function fetchRef(url: string, ref: string, dir: string, keyFile?: string)
 }
 
 // Download the code into the app's source folder. Returns that folder.
-export async function fetchSource(app: string, log: (l: string) => void): Promise<string> {
+export async function fetchSource(app: string, log: (l: string) => void, setCommit: (c: string) => void = () => {}): Promise<string> {
   const row = getGit(app);
   if (!row?.repo) throw new Error("This app isn't connected to a Git repo.");
   const ref = row.ref ?? row.branch;
@@ -136,6 +136,9 @@ export async function fetchSource(app: string, log: (l: string) => void): Promis
           : "Couldn't download the repo. Check the URL and try again.",
     );
   }
+  // Remember which commit this is ("a1b2c3d Fix login"), for the Versions page.
+  const commit = await run("git", ["-C", dir, "log", "-1", "--format=%h %s"]).catch(() => "");
+  if (commit) { setCommit(commit.slice(0, 200)); log(`→ Commit ${commit}`); }
   rmSync(join(dir, ".git"), { recursive: true, force: true }); // the build doesn't need it
   return dir;
 }
@@ -148,7 +151,7 @@ const queued = new Map<string, string>(); // app → why
 export function queueDeploy(app: string, reason: string) {
   if (isBusy(app)) { queued.set(app, reason); return "queued" as const; }
   lock(app);
-  deploy(app, async (log) => { log(reason); return fetchSource(app, log); })
+  deploy(app, async (log, setCommit) => { log(reason); return fetchSource(app, log, setCommit); }, undefined, [], reason.replace(/^→ /, ""))
     .catch(() => {}) // the error is already in the deploy log
     .finally(() => {
       unlock(app);

@@ -10,6 +10,8 @@ import { logsPage } from "./logs.js";
 import { domainsPage } from "./domains.js";
 import { storagePage } from "./storage.js";
 import { databasePage } from "./database.js";
+import { versionsPage } from "./versions.js";
+import { variablesPage } from "./variables.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -54,7 +56,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs: logsPage, variables, database: databasePage, files: filesPage, storage, domains: domainsPage, crons, settings }[section] ?? overview;
+  const show = { overview, versions: versionsPage, logs: logsPage, variables: variablesPage, database: databasePage, files: filesPage, storage, domains: domainsPage, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -283,100 +285,6 @@ function settings(box, base, app) {
 }
 
 // Domains: change the free address, add your own domains.
-// Each version is a collapsible row. Opening it loads its build log.
-// While a version is building, it stays open and its log updates live.
-function versions(box, base, app) {
-  if (!app.deploys.length) { box.innerHTML = `<div class="card pad muted">No versions yet.</div>`; return; }
-  box.innerHTML = `<div class="card">${app.deploys.map((d) => `
-    <details class="ver" data-id="${d.id}">
-      <summary>
-        <span class="chev">${icon("chevron")}</span>
-        <span class="status ${esc(d.status)}">${esc(d.status)}</span>
-        <span class="grow">Version #${d.id} ${d.current ? `<span class="badge">Running</span>` : ""}</span>
-        <span class="muted">${timeAgo(d.created_at)}</span>
-      </summary>
-      <div class="verbody">
-        ${d.current ? "" : d.canActivate
-          ? `<div><button class="btn" data-use="${d.id}">${icon("history")} Roll back to this version</button></div>`
-          : `<div class="row"><button class="btn" disabled>${icon("history")} Roll back</button>
-             <span class="note">${d.status === "live" ? "Made before rollback existed, can't be restored." : "This version didn't build, so there's nothing to restore."}</span></div>`}
-        <pre class="log">Loading log…</pre>
-      </div>
-    </details>`).join("")}</div>`;
-
-  // Live view of a version that's still building.
-  const building = app.deploys.find((d) => d.status === "building");
-  if (building) {
-    const el = box.querySelector(`details[data-id="${building.id}"]`);
-    el.open = true;
-    const pre = el.querySelector("pre");
-    pre.dataset.loaded = "1";
-    const timer = setInterval(async () => {
-      try {
-        const d = await api(`${base}/deploys/${building.id}`);
-        const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
-        pre.textContent = d.log || "Starting…";
-        if (atBottom) pre.scrollTop = pre.scrollHeight;
-        if (d.status !== "building") { clearInterval(timer); versions(box, base, await api(base)); }
-      } catch { clearInterval(timer); }
-    }, 2000);
-    box.stop = () => clearInterval(timer);
-  }
-
-  box.querySelectorAll("details.ver").forEach((el) => el.addEventListener("toggle", async () => {
-    const pre = el.querySelector("pre");
-    if (!el.open || pre.dataset.loaded) return;
-    const d = await api(`${base}/deploys/${el.dataset.id}`);
-    pre.textContent = d.log || "(empty log)";
-    pre.dataset.loaded = "1";
-  }));
-  box.querySelectorAll("[data-use]").forEach((b) => (b.onclick = async () => {
-    if (!confirm(`Switch the live site to version #${b.dataset.use}?`)) return;
-    b.disabled = true;
-    try {
-      await api(`${base}/versions/${b.dataset.use}/activate`, { method: "POST" });
-      toast(`Now running version #${b.dataset.use}`);
-      versions(box, base, await api(base));
-    } catch (err) { toast(err.message); b.disabled = false; }
-  }));
-}
-
-async function variables(box, base) {
-  const vars = await api(`${base}/env`);
-  box.innerHTML = `
-    <form class="card pad row" id="add" style="margin-bottom:12px">
-      <input name="key" placeholder="NAME" style="flex:1;min-width:140px" required>
-      <input name="value" placeholder="value" style="flex:2;min-width:180px">
-      <button class="btn primary">${icon("plus")} Add</button>
-    </form>
-    <p class="muted" style="margin:0 2px 10px;font-size:13px">Saving restarts the app. ${icon("lock")} = created by Deploy Boat.</p>
-    <div class="card list">${vars.map((v) => `
-      <div>
-        <code style="min-width:200px">${esc(v.key)}</code>
-        <span class="grow secret muted" data-val="${esc(v.value)}">••••••••</span>
-        <button class="btn" data-show>Show</button>
-        <button class="btn" data-copy="${esc(v.value)}">${icon("copy")}</button>
-        ${v.builtin ? `<span class="muted" title="Managed by Deploy Boat">${icon("lock")}</span>`
-                    : `<button class="btn danger" data-del="${esc(v.key)}">${icon("trash")}</button>`}
-      </div>`).join("") || `<div class="muted">No variables yet.</div>`}
-    </div>`;
-
-  wireFields(box);
-  const form = box.querySelector("#add");
-  form.onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await api(`${base}/env`, { method: "PUT", body: { key: form.key.value.trim(), value: form.value.value } });
-      toast("Saved"); variables(box, base);
-    } catch (err) { toast(err.message); }
-  };
-  box.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
-    if (!confirm(`Remove ${b.dataset.del}? The app will restart.`)) return;
-    try { await api(`${base}/env/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Removed"); variables(box, base); }
-    catch (err) { toast(err.message); }
-  }));
-}
-
 // Danger zone at the bottom of the Database / Storage page.
 export function removeServiceBox(box, base, app, service) {
   const db = service === "database";
