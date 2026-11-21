@@ -408,9 +408,6 @@ details.guide summary { cursor: pointer; }
 .dnsprob p { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
 .dnsok { display: flex; align-items: center; gap: 6px; color: var(--ok); font-size: 13.5px; }
 .dnsok b { color: var(--ink); }
-.domrow { display: block !important; }
-.domrow > .row { flex-wrap: nowrap; }
-.domrow .dnshelp { margin-top: 12px; }
 @media (max-width: 640px) {
   .dnsrec { grid-template-columns: 1fr; }
   .dnsrec > div { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -601,37 +598,44 @@ details.guide summary { cursor: pointer; }
 .cronrun .log { margin: 0; max-height: 320px; }
 @media (max-width: 800px) { .logsplit { grid-template-columns: minmax(0, 1fr); } .loglist { max-height: 200px; } .logview { height: 60vh; } }
 
-/* App → Domains */
-.domcard .sethead { margin-bottom: 12px; }
-.addr { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
-.addr:first-child { border-top: 0; }
-.addr .pill { flex: none; min-width: 52px; text-align: center; }
-.addr .note, .domline .note { display: block; }
-.domhost { color: var(--ink); font-weight: 500; text-decoration: none; word-break: break-all; }
-.domhost:hover { color: var(--accent); }
-.domrename { display: grid; gap: 8px; max-width: 520px; }
-.suffixed { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); overflow: hidden; }
-.suffixed:focus-within { border-color: var(--accent); outline: 2px solid var(--soft); }
-.suffixed input { border: 0; outline: 0 !important; background: none; min-width: 80px; }
-.suffixed span { padding: 0 12px 0 0; color: var(--muted); white-space: nowrap; }
-.domadd { border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+/* App → Domains: one table, every address */
+.domadd { padding: 14px 18px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.domadd .btn { white-space: nowrap; flex: none; }
 .domwww { display: flex; align-items: center; gap: 6px; font-size: 13.5px; cursor: pointer; }
 .domwww input { width: auto; }
-.domlist > .domitem { display: block; padding: 0; }
-.domline { display: flex; align-items: center; gap: 12px; padding: 12px 18px; }
-.domstate { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; }
-.domitem.ready .domstate { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
-.domitem.ready .domstate svg.i { width: 15px; height: 15px; }
-.domitem.waiting .domstate { background: color-mix(in srgb, var(--warn) 15%, transparent); }
-.domitem.waiting .domstate .spinner { border-top-color: var(--warn); }
-.domhelp { padding: 0 18px 16px 56px; }
-.domfoot { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 8px 18px; border-top: 1px solid var(--line); background: var(--bg); border-radius: 0 0 12px 12px; }
-.domempty { padding: 18px 20px 20px; }
-.domempty .steps li { color: var(--muted); font-size: 13.5px; } .domempty .steps b { color: var(--ink); }
-@media (max-width: 600px) { .domhelp { padding-left: 18px; } .dnsrec { grid-template-columns: 1fr; } .dnsrec > div { border-right: 0; border-bottom: 1px solid var(--line); } }
+.domtable { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }
+.domhead, .domrow { display: contents; }
+.domhead span { padding: 8px 18px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--line); }
+.domcell, .domacts { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; padding: 12px 18px; border-bottom: 1px solid var(--line); min-width: 0; }
+.domacts { gap: 2px; padding-left: 6px; justify-content: flex-end; flex-wrap: nowrap; }
+.domrow:hover > * { background: color-mix(in srgb, var(--bg) 60%, transparent); }
+.domrow.off > * { opacity: .6; } .domrow.off .domacts { opacity: 1; }
+.domrow.editing > * { background: var(--bg); }
+.domrow.editing input { padding: 6px 10px; }
+.domrow .note { font-size: 12.5px; }
+.domhost { color: var(--ink); font-weight: 500; text-decoration: none; word-break: break-all; }
+a.domhost:hover { color: var(--accent); }
+.domsub { flex-basis: 100%; } .domsub a { color: inherit; }
+.domstat { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; color: var(--muted); }
+.domstat.ok { color: var(--ok); } .domstat.warn { color: var(--warn); }
+.domstat svg.i { width: 15px; height: 15px; }
+.domstat .spinner { border-top-color: var(--warn); }
+.domacts .danger:hover { color: var(--bad); }
+.domhelp { grid-column: 1 / -1; padding: 4px 18px 16px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--warn) 4%, transparent); }
+.domhelp .dnshelp { margin-top: 10px; }
+.domfoot { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 8px 18px; background: var(--bg); border-radius: 0 0 12px 12px; }
+.suffixed { display: flex; align-items: center; flex-wrap: nowrap !important; }
+.suffixed input { min-width: 80px; }
+.suffixed span { color: var(--muted); white-space: nowrap; }
 .pill.plain { --c: var(--muted); }
-.domadd .btn { white-space: nowrap; flex: none; }
-.domadd.pad { padding-top: 14px; padding-bottom: 14px; }
+@media (max-width: 700px) {
+  /* On phones each row stacks: domain, status, then the buttons. */
+  .domtable { grid-template-columns: minmax(0, 1fr); }
+  .domhead { display: none; }
+  .domrow > .domcell { border-bottom: 0; padding-bottom: 2px; }
+  .domacts { justify-content: flex-start; padding-left: 12px; }
+  .dnsrec { grid-template-columns: 1fr; } .dnsrec > div { border-right: 0; border-bottom: 1px solid var(--line); }
+}
 
 /* Files: loading states */
 .fb-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); font-size: 13px; padding: 40px 16px; flex: 1; }

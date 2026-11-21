@@ -6,8 +6,10 @@ import { provisionServices, addService, type ServiceName } from "../services/ind
 import { start } from "./run.ts";
 import { syncRoutes } from "./route.ts";
 import { notify } from "../alerts/index.ts";
+import { mainHost } from "../lib/domains.ts";
 
-export const appUrl = (name: string) => `https://${name}.${config.baseDomain}`;
+// The app's main address (its own domain if the free address is turned off, see lib/domains.ts).
+export const appUrl = (name: string) => `https://${mainHost(name)}`;
 
 // `source` is a folder that's already there (CLI upload), or a function that
 // fetches the code first (Git). Either way, the log is saved as it happens.

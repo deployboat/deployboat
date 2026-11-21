@@ -11,7 +11,7 @@ import { previewsOf } from "../deploy/previews.ts";
 import { backupNow } from "../backups/index.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
 import { resolveName, isStopped, displayName } from "../lib/db.ts";
-import { domainsOf, domainOwner, addDomain, removeDomain, hostTaken } from "../lib/domains.ts";
+import { domainsOf, domainOwner, addDomain, removeDomain, hostTaken, freeAddressOn, setFreeAddress } from "../lib/domains.ts";
 import { checkDns, cleanHost, looksLikeHost } from "../lib/dns.ts";
 import { syncRoutes } from "../deploy/route.ts";
 import { config } from "../lib/config.ts";
@@ -250,26 +250,64 @@ apps.get("/:name/domains", async (c) => {
     const dns = await checkDns(host);
     return { host, ready: dns.ok, dns };
   }));
-  return c.json({ address: appUrl(name), baseDomain: config.baseDomain, nipDomain: config.nipDomain, ip: config.publicIp, custom });
+  return c.json({
+    address: appUrl(name), baseDomain: config.baseDomain, nipDomain: config.nipDomain, ip: config.publicIp,
+    free: { on: freeAddressOn(name), host: `${name}.${config.baseDomain}`, backup: config.baseDomain !== config.nipDomain ? `${name}.${config.nipDomain}` : null },
+    custom,
+  });
 });
+
+// Check a domain name before adding it. Returns an error message, or null if it can be used.
+function canUse(name: string, host: string) {
+  if (!looksLikeHost(host)) return "That doesn't look like a domain. Example: myshop.com or www.myshop.com";
+  const taken = hostTaken(host);
+  if (taken) return taken;
+  const owner = domainOwner(host);
+  if (owner) return owner === name ? "Already added." : `This domain is used by ${displayName(owner)}.`;
+  return null;
+}
 
 apps.post("/:name/domains", async (c) => {
   const name = c.req.param("name");
   const { host: raw } = await c.req.json().catch(() => ({}));
   const host = cleanHost(raw);
-  if (!looksLikeHost(host)) return c.json({ error: "That doesn't look like a domain. Example: myshop.com or www.myshop.com" }, 400);
-  const taken = hostTaken(host);
-  if (taken) return c.json({ error: taken }, 400);
-  const owner = domainOwner(host);
-  if (owner) return c.json({ error: owner === name ? "Already added." : `This domain is used by ${displayName(owner)}.` }, 409);
+  const problem = canUse(name, host);
+  if (problem) return c.json({ error: problem }, 400);
   addDomain(name, host);
   await syncRoutes();
   const dns = await checkDns(host);
   return c.json({ ok: true, ready: dns.ok, dns });
 });
 
+// Change a domain to another name (like www.myshop.com → shop.myshop.com).
+apps.put("/:name/domains/:host", async (c) => {
+  const name = c.req.param("name"), old = c.req.param("host");
+  if (!domainsOf(name).includes(old)) return c.json({ error: "Domain not found." }, 404);
+  const host = cleanHost((await c.req.json().catch(() => ({}))).host);
+  if (host === old) return c.json({ ok: true });
+  const problem = canUse(name, host);
+  if (problem) return c.json({ error: problem }, 400);
+  removeDomain(name, old);
+  addDomain(name, host);
+  await syncRoutes();
+  return c.json({ ok: true });
+});
+
 apps.delete("/:name/domains/:host", async (c) => {
-  removeDomain(c.req.param("name"), c.req.param("host"));
+  const name = c.req.param("name"), host = c.req.param("host");
+  // The app must keep at least one address.
+  if (!freeAddressOn(name) && domainsOf(name).length <= 1) return c.json({ error: "This is the app's only address. Turn the free address back on first, or add another domain." }, 400);
+  removeDomain(name, host);
+  await syncRoutes();
+  return c.json({ ok: true });
+});
+
+// Turn the free address (<name>.<server domain>) off or on. Off only when the app has a domain of its own.
+apps.put("/:name/free-address", async (c) => {
+  const name = c.req.param("name");
+  const { on } = await c.req.json().catch(() => ({}));
+  if (!on && !domainsOf(name).length) return c.json({ error: "Add a domain of your own first, so the app still has an address." }, 400);
+  setFreeAddress(name, !!on);
   await syncRoutes();
   return c.json({ ok: true });
 });

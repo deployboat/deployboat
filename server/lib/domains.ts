@@ -6,7 +6,7 @@
 // The free nip.io addresses always keep working, so a DNS mistake never locks you out.
 import { db } from "./db.ts";
 import { config } from "./config.ts";
-import { getSetting, setSetting } from "./settings.ts";
+import { getSetting, setSetting, deleteSetting } from "./settings.ts";
 import { checkDns } from "./dns.ts";
 
 db.exec("CREATE TABLE IF NOT EXISTS domains (host TEXT PRIMARY KEY, app TEXT NOT NULL)");
@@ -34,7 +34,24 @@ export function saveServerDomain(d: ServerDomain) {
 export const dashboardHosts = () => [...new Set([config.dashboardHost, config.nipDashboard])];
 
 // An app's own free addresses: <name>.<your domain> and <name>.<ip>.nip.io.
-export const appHosts = (app: string) => [...new Set([`${app}.${config.baseDomain}`, `${app}.${config.nipDomain}`])];
+// They can be turned off (on the app's Domains page) once the app has a domain of its own.
+export const freeHosts = (app: string) => [...new Set([`${app}.${config.baseDomain}`, `${app}.${config.nipDomain}`])];
+export const freeAddressOn = (app: string) => !getSetting<{ off: boolean }>(`free:${app}`, { off: false }).off;
+export const appHosts = (app: string) => (freeAddressOn(app) ? freeHosts(app) : []);
+
+export function setFreeAddress(app: string, on: boolean) {
+  if (on) deleteSetting(`free:${app}`); else setSetting(`free:${app}`, { off: true });
+}
+// On rename, the setting moves with the app. On delete, it goes.
+export function moveFreeSetting(oldApp: string, newApp: string | null) {
+  if (!freeAddressOn(oldApp) && newApp) setFreeAddress(newApp, false);
+  deleteSetting(`free:${oldApp}`);
+}
+
+// The app's main address: the free one, or its first own domain if the free one is off.
+export function mainHost(app: string) {
+  return freeAddressOn(app) ? `${app}.${config.baseDomain}` : (domainsOf(app)[0] ?? `${app}.${config.baseDomain}`);
+}
 
 // --- app domains -----------------------------------------------------------------
 

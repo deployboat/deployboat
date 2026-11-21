@@ -1,12 +1,13 @@
-// App → Domains: every address that reaches the app.
+// App → Domains: one table with every address of the app.
 //
-//   Free address   <name>.<server domain>, always works. Editable (renames the app).
-//   Your domains   domains you own, like myshop.com. We check their DNS and say what to fix.
+// The free address (<name>.<server domain>) is a row like the others:
+//   edit   = change the name (renames the app; data stays)
+//   delete = turn it off (only when the app has a domain of its own). It can come back.
+// Your own domains (myshop.com): edit the name, delete, and see their DNS status.
 //
-// While a domain waits for DNS, the list checks again every 15 seconds. Only the list
-// redraws, so whatever you're typing in the forms stays.
-import { api, esc, icon, toast, copy } from "../app.js";
-import { openMenu } from "../menu.js";
+// While a domain waits for DNS, the table checks again every 15 seconds. Only the table
+// redraws, so what you're typing in the "Add" box stays.
+import { api, esc, icon, toast } from "../app.js";
 import { dnsHelp, wireCopy } from "./dns.js";
 
 const RECHECK = 15; // seconds
@@ -14,142 +15,165 @@ const RECHECK = 15; // seconds
 export async function domainsPage(box, base, app) {
   let d = await api(`${base}/domains`);
   let timer = null, countdown = RECHECK;
+  let editing = null;          // the host being edited (or "free")
+  const openHelp = new Set();  // hosts whose DNS steps are shown
+  d.custom.filter((x) => !x.ready).forEach((x) => openHelp.add(x.host));
 
   box.innerHTML = `
-    <div class="card pad domcard">
-      <div class="sethead">
-        <span class="tile">${icon("globe")}</span>
-        <div class="grow"><b>Free address</b>
-          <p class="muted">Always works, with HTTPS. Nothing to set up.</p></div>
-      </div>
-      <div id="free"></div>
-    </div>
-
-    <div class="card domcard" style="margin-top:14px">
-      <div class="sethead pad">
-        <span class="tile">${icon("link")}</span>
-        <div class="grow"><b>Your domains</b>
-          <p class="muted">Use a domain you own, like <code>myshop.com</code>. HTTPS is set up automatically once its DNS is right.</p></div>
-      </div>
-      <form class="domadd pad" id="add">
+    <div class="card domcard">
+      <form class="domadd" id="add">
         <div class="row" style="flex-wrap:nowrap;gap:8px">
-          <input name="host" placeholder="myshop.com" required autocomplete="off" spellcheck="false">
+          <div class="fb-filter grow">${icon("globe")}<input name="host" placeholder="Add a domain you own, like myshop.com" required autocomplete="off" spellcheck="false"></div>
           <button class="btn primary">${icon("plus")} Add domain</button>
         </div>
         <label class="domwww" hidden><input type="checkbox" name="www" checked> Also add <code id="wwwname"></code> <span class="note">so both work</span></label>
       </form>
-      <div id="list"></div>
-    </div>`;
+      <div id="table"></div>
+    </div>
+    <p class="note" style="margin-top:10px">HTTPS is set up by itself for every address. Your own domains need one DNS record; each row shows what to add.</p>`;
 
-  // --- free address -------------------------------------------------------
+  // --- the table --------------------------------------------------------------
 
-  function drawFree(editing = false) {
-    const el = box.querySelector("#free");
-    const backup = d.baseDomain !== d.nipDomain ? `${app.name}.${d.nipDomain}` : null;
-    if (!editing) {
-      el.innerHTML = `
-        ${addrRow(d.address, "Live", "ok", `<button class="btn ghost" id="editname" title="Change the address">${icon("edit")}</button>`)}
-        ${backup ? addrRow(`https://${backup}`, "Backup", "plain", "", "Works too, even if your server domain's DNS breaks.") : ""}`;
-      el.querySelector("#editname").onclick = () => drawFree(true);
-      wireCopy(el);
-      return;
-    }
-    el.innerHTML = `
-      <form class="domrename">
-        <div class="suffixed"><input name="name" value="${esc(app.name)}" pattern="[a-z0-9][a-z0-9\\-]*" maxlength="40" required spellcheck="false">
-          <span>.${esc(d.baseDomain)}</span></div>
-        <p class="note" id="preview"></p>
-        <div class="row" style="gap:6px"><button class="btn primary">Change address</button><button type="button" class="btn" data-x>Cancel</button></div>
-      </form>`;
-    const f = el.querySelector("form");
-    const preview = () => {
-      const v = f.name.value.trim().toLowerCase();
-      el.querySelector("#preview").innerHTML = v === app.name ? "Type a new name. Only lowercase letters, numbers and dashes."
-        : `New address: <b>https://${esc(v)}.${esc(d.baseDomain)}</b>. The old one stops working; your database, files and data stay.`;
-    };
-    f.name.oninput = preview; preview();
-    f.name.focus(); f.name.select();
-    el.querySelector("[data-x]").onclick = () => drawFree();
-    f.onsubmit = async (e) => {
-      e.preventDefault();
-      const newName = f.name.value.trim().toLowerCase();
-      if (newName === app.name) return drawFree();
-      try {
-        const r = await api(`${base}/rename`, { method: "POST", body: { newName } });
-        toast("Address changed");
-        location.hash = `#/apps/${encodeURIComponent(r.name)}/domains`;
-      } catch (err) { toast(err.message); }
-    };
-  }
-
-  // --- your domains ---------------------------------------------------------
-
-  // Remember which DNS help boxes are open, so a recheck doesn't close them.
-  const openHelp = new Set();
-
-  function drawList() {
-    const el = box.querySelector("#list");
+  function draw() {
+    const el = box.querySelector("#table");
+    const main = d.address.replace(/^https:\/\//, "");
+    const rows = [freeRow(d.free, main), ...d.custom.map((x) => customRow(x, main))];
     const waiting = d.custom.filter((x) => !x.ready).length;
-    el.innerHTML = d.custom.length ? `
-      <div class="list domlist">${d.custom.map((x) => `
-        <div class="domitem ${x.ready ? "ready" : "waiting"}">
-          <div class="domline">
-            <span class="domstate">${x.ready ? icon("check") : `<span class="spinner sm"></span>`}</span>
-            <span class="grow"><a href="https://${esc(x.host)}" target="_blank" class="domhost">${esc(x.host)}</a>
-              <span class="note">${x.ready ? "Connected · HTTPS on" : "Waiting for DNS"}</span></span>
-            ${x.ready ? "" : `<button class="btn" data-help="${esc(x.host)}">${openHelp.has(x.host) ? "Hide steps" : "How to fix"}</button>`}
-            <button class="btn ghost" data-more="${esc(x.host)}" title="More">${icon("dots")}</button>
-          </div>
-          ${!x.ready && openHelp.has(x.host) ? `<div class="domhelp">${dnsHelp(x.dns)}</div>` : ""}
-        </div>`).join("")}
+    el.innerHTML = `
+      <div class="domtable">
+        <div class="domhead"><span>Domain</span><span>Status</span><span></span></div>
+        ${rows.join("")}
       </div>
       ${waiting ? `<div class="domfoot"><span class="note" id="countdown"></span>
-        <button class="btn ghost" id="checknow">${icon("restart")} Check now</button></div>` : ""}`
-      : `<div class="domempty">
-          <ol class="steps">
-            <li><b>Add your domain above.</b> Both <code>myshop.com</code> and <code>www.myshop.com</code> work.</li>
-            <li><b>Add one DNS record</b> where you bought it (Namecheap, GoDaddy, Cloudflare…). Usually an <b>A record</b> pointing to <code>${esc(d.ip)}</code>. This page shows exactly what to add.</li>
-            <li><b>Wait a few minutes.</b> We check by ourselves and turn on HTTPS once it's right.</li>
-          </ol>
-        </div>`;
+        <button class="btn ghost" id="checknow">${icon("restart")} Check now</button></div>` : ""}`;
     wireCopy(el);
-    el.querySelectorAll("[data-help]").forEach((b) => (b.onclick = () => {
-      const h = b.dataset.help;
-      openHelp.has(h) ? openHelp.delete(h) : openHelp.add(h);
-      drawList();
-    }));
-    el.querySelectorAll("[data-more]").forEach((b) => (b.onclick = () => rowMenu(b, b.dataset.more)));
-    el.querySelector("#checknow")?.addEventListener("click", (e) => recheck(e.currentTarget));
+    wire(el);
     tick();
   }
 
-  function rowMenu(btn, host) {
-    openMenu(btn, (menu, close) => {
-      menu.innerHTML = `
-        <a href="https://${esc(host)}" target="_blank">${icon("external")}<span class="grow">Open</span></a>
-        <button data-a="copy">${icon("copy")}<span class="grow">Copy address</span></button>
-        <hr>
-        <button data-a="remove" class="danger">${icon("trash")}<span class="grow">Remove domain</span></button>`;
-      menu.querySelector("a").onclick = close;
-      menu.querySelector('[data-a="copy"]').onclick = () => { copy(`https://${host}`); close(); };
-      menu.querySelector('[data-a="remove"]').onclick = async () => {
-        close();
-        if (!confirm(`Remove ${host}?\n\nVisitors on that address won't reach this app anymore. You can add it again later.`)) return;
-        try { await api(`${base}/domains/${encodeURIComponent(host)}`, { method: "DELETE" }); toast("Removed"); }
-        catch (err) { return toast(err.message); }
-        await refresh();
-      };
-    }, { align: "right" });
+  // The free address row: on (edit / turn off) or off (turn on).
+  function freeRow(f, main) {
+    if (!f.on) return `
+      <div class="domrow off">
+        <div class="domcell"><span class="domhost">${esc(f.host)}</span><span class="tag">Free</span></div>
+        <div class="domcell"><span class="domstat">${icon("x")} Turned off</span></div>
+        <div class="domacts"><button class="btn" data-a="free-on">Turn on</button></div>
+      </div>`;
+    if (editing === "free") return `
+      <form class="domrow editing" data-form="free">
+        <div class="domcell suffixed"><input name="v" value="${esc(app.name)}" pattern="[a-z0-9][a-z0-9\\-]*" maxlength="40" required spellcheck="false">
+          <span>.${esc(d.baseDomain)}</span></div>
+        <div class="domcell note">Renames the app. The old address stops working; data stays.</div>
+        <div class="domacts"><button class="btn primary">Save</button><button type="button" class="btn" data-a="cancel">Cancel</button></div>
+      </form>`;
+    return `
+      <div class="domrow">
+        <div class="domcell"><a class="domhost" href="https://${esc(f.host)}" target="_blank">${esc(f.host)}</a>
+          <span class="tag">Free</span>${f.host === main ? `<span class="badge">Main</span>` : ""}
+          ${f.backup ? `<span class="note domsub">Also <a href="https://${esc(f.backup)}" target="_blank">${esc(f.backup)}</a>, if your server domain's DNS breaks</span>` : ""}</div>
+        <div class="domcell"><span class="domstat ok">${icon("check")} Live · HTTPS</span></div>
+        ${actions(f.host, "free")}
+      </div>`;
+  }
+
+  function customRow(x, main) {
+    if (editing === x.host) return `
+      <form class="domrow editing" data-form="${esc(x.host)}">
+        <div class="domcell"><input name="v" value="${esc(x.host)}" required spellcheck="false"></div>
+        <div class="domcell note">You'll need a DNS record for the new name.</div>
+        <div class="domacts"><button class="btn primary">Save</button><button type="button" class="btn" data-a="cancel">Cancel</button></div>
+      </form>`;
+    const help = !x.ready && openHelp.has(x.host);
+    return `
+      <div class="domrow ${x.ready ? "" : "waiting"}">
+        <div class="domcell"><a class="domhost" href="https://${esc(x.host)}" target="_blank">${esc(x.host)}</a>
+          ${x.host === main ? `<span class="badge">Main</span>` : ""}</div>
+        <div class="domcell">${x.ready
+          ? `<span class="domstat ok">${icon("check")} Live · HTTPS</span>`
+          : `<span class="domstat warn"><span class="spinner sm"></span> Waiting for DNS</span>
+             <button class="linkbtn" data-help="${esc(x.host)}">${help ? "Hide steps" : "How to fix"}</button>`}</div>
+        ${actions(x.host, x.host)}
+      </div>
+      ${help ? `<div class="domhelp">${dnsHelp(x.dns)}</div>` : ""}`;
+  }
+
+  // Copy, open, edit, delete. `id` is "free" or the host.
+  const actions = (host, id) => `
+    <div class="domacts">
+      <button class="btn ghost" data-copy="https://${esc(host)}" title="Copy">${icon("copy")}</button>
+      <a class="btn ghost" href="https://${esc(host)}" target="_blank" title="Open">${icon("external")}</a>
+      <button class="btn ghost" data-a="edit" data-id="${esc(id)}" title="Edit">${icon("edit")}</button>
+      <button class="btn ghost danger" data-a="delete" data-id="${esc(id)}" title="${id === "free" ? "Turn off" : "Remove"}">${icon("trash")}</button>
+    </div>`;
+
+  // --- what the buttons do -----------------------------------------------------
+
+  function wire(el) {
+    el.querySelectorAll("[data-help]").forEach((b) => (b.onclick = () => {
+      const h = b.dataset.help;
+      openHelp.has(h) ? openHelp.delete(h) : openHelp.add(h);
+      draw();
+    }));
+    el.querySelectorAll("[data-a]").forEach((b) => (b.onclick = () => act(b.dataset.a, b.dataset.id, b)));
+    el.querySelector("#checknow")?.addEventListener("click", (e) => recheck(e.currentTarget));
+    const form = el.querySelector("[data-form]");
+    if (form) {
+      form.v.focus(); form.v.select();
+      form.onkeydown = (e) => { if (e.key === "Escape") { editing = null; draw(); } };
+      form.onsubmit = (e) => { e.preventDefault(); save(form.dataset.form, form.v.value.trim().toLowerCase()); };
+    }
+  }
+
+  async function act(action, id, btn) {
+    if (action === "edit") { editing = id; return draw(); }
+    if (action === "cancel") { editing = null; return draw(); }
+    btn.disabled = true;
+    try {
+      if (action === "free-on") {
+        await api(`${base}/free-address`, { method: "PUT", body: { on: true } });
+        toast("Free address is on again");
+      }
+      if (action === "delete" && id === "free") {
+        if (!d.custom.length) { btn.disabled = false; return toast("Add a domain of your own first, so the app still has an address."); }
+        if (!confirm(`Turn off ${d.free.host}?\n\nThe app will only be reachable on your own domains. You can turn it back on any time.`)) { btn.disabled = false; return; }
+        await api(`${base}/free-address`, { method: "PUT", body: { on: false } });
+        toast("Free address turned off");
+      }
+      if (action === "delete" && id !== "free") {
+        if (!confirm(`Remove ${id}?\n\nVisitors on that address won't reach this app anymore. You can add it again later.`)) { btn.disabled = false; return; }
+        await api(`${base}/domains/${encodeURIComponent(id)}`, { method: "DELETE" });
+        toast("Removed");
+      }
+    } catch (err) { btn.disabled = false; return toast(err.message); }
+    await refresh();
+  }
+
+  async function save(id, value) {
+    try {
+      if (id === "free") {
+        if (value === app.name) { editing = null; return draw(); }
+        const r = await api(`${base}/rename`, { method: "POST", body: { newName: value } });
+        toast("Address changed");
+        location.hash = `#/apps/${encodeURIComponent(r.name)}/domains`; // the app has a new name: reload the page
+        return;
+      }
+      await api(`${base}/domains/${encodeURIComponent(id)}`, { method: "PUT", body: { host: value } });
+      toast("Domain changed");
+      openHelp.add(value);
+    } catch (err) { return toast(err.message); }
+    editing = null;
+    await refresh();
   }
 
   async function refresh() {
     try { d = await api(`${base}/domains`); } catch { return; }
     if (!box.isConnected) return;
     countdown = RECHECK;
-    drawList();
+    draw();
   }
 
   async function recheck(btn) {
+    if (editing) { countdown = RECHECK; return tick(); } // don't redraw under someone's typing
     if (btn) { btn.disabled = true; btn.innerHTML = `<span class="spinner sm"></span> Checking…`; }
     const before = new Set(d.custom.filter((x) => x.ready).map((x) => x.host));
     await refresh();
@@ -163,27 +187,27 @@ export async function domainsPage(box, base, app) {
     clearTimeout(timer);
     if (!d.custom.some((x) => !x.ready) || !box.isConnected) return;
     const el = box.querySelector("#countdown");
-    if (el) el.textContent = `Checking again in ${countdown} s`;
+    if (el) el.textContent = `Checking DNS again in ${countdown} s`;
     timer = setTimeout(() => (--countdown <= 0 ? recheck() : tick()), 1000);
   }
 
-  // --- add a domain ---------------------------------------------------------
+  // --- add a domain ------------------------------------------------------------
 
   const add = box.querySelector("#add");
+  const clean = (h) => h.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   // For "myshop.com" (no subdomain), offer www.myshop.com too.
-  const isApex = (h) => h.split(".").length === 2 || /\.(co|com|org|net|ac|gov)\.[a-z]{2}$/.test(h) && h.split(".").length === 3;
+  const isApex = (h) => h.split(".").length === 2 || (/\.(co|com|org|net|ac|gov)\.[a-z]{2}$/.test(h) && h.split(".").length === 3);
   add.host.oninput = () => {
-    const h = add.host.value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    const offer = isApex(h) && !d.custom.some((x) => x.host === `www.${h}`);
-    add.querySelector(".domwww").hidden = !offer;
+    const h = clean(add.host.value);
+    add.querySelector(".domwww").hidden = !(isApex(h) && !d.custom.some((x) => x.host === `www.${h}`));
     add.querySelector("#wwwname").textContent = `www.${h}`;
   };
   add.onsubmit = async (e) => {
     e.preventDefault();
     const btn = add.querySelector(".primary"); btn.disabled = true;
-    const host = add.host.value.trim();
+    const host = clean(add.host.value);
     const hosts = [host];
-    if (!add.querySelector(".domwww").hidden && add.www.checked) hosts.push(`www.${host.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")}`);
+    if (!add.querySelector(".domwww").hidden && add.www.checked) hosts.push(`www.${host}`);
     try {
       for (const h of hosts) {
         const r = await api(`${base}/domains`, { method: "POST", body: { host: h } });
@@ -191,25 +215,11 @@ export async function domainsPage(box, base, app) {
       }
       toast(hosts.length > 1 ? "Domains added" : "Domain added");
       add.reset(); add.querySelector(".domwww").hidden = true;
-      await refresh();
-    } catch (err) { toast(err.message); await refresh(); }
+    } catch (err) { toast(err.message); }
     btn.disabled = false;
+    await refresh();
   };
 
-  drawFree();
-  d.custom.filter((x) => !x.ready).forEach((x) => openHelp.add(x.host));
-  drawList();
+  draw();
   return () => clearTimeout(timer);
-}
-
-// One address with a label, a copy button and an open link.
-function addrRow(url, label, kind, extra = "", note = "") {
-  return `<div class="addr">
-    <span class="pill ${kind}">${label}</span>
-    <span class="grow"><a href="${esc(url)}" target="_blank" class="domhost">${esc(url.replace(/^https:\/\//, ""))}</a>
-      ${note ? `<span class="note">${note}</span>` : ""}</span>
-    <button class="btn ghost" data-copy="${esc(url)}" title="Copy">${icon("copy")}</button>
-    <a class="btn ghost" href="${esc(url)}" target="_blank" title="Open">${icon("external")}</a>
-    ${extra}
-  </div>`;
 }

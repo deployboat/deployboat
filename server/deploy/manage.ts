@@ -10,6 +10,7 @@ import "../lib/domains.ts"; // and the domains table
 import "../lib/share.ts"; // and the share table
 import { removeCrons } from "../crons/index.ts";
 import { renameDataDir, removeDataDir } from "../lib/appdata.ts";
+import { moveFreeSetting } from "../lib/domains.ts";
 import "../backups/index.ts"; // makes sure the backups table exists
 import "../monitor/index.ts"; // and the metrics tables
 
@@ -56,6 +57,7 @@ export async function remove(app: string) {
   db.prepare("DELETE FROM git WHERE app = ?").run(app);
   db.prepare("DELETE FROM domains WHERE app = ?").run(app);
   db.prepare("DELETE FROM share WHERE app = ?").run(app);
+  moveFreeSetting(app, null);
   removeCrons(app);
   if (isPreview) removeDataDir(app);
   await syncRoutes();
@@ -73,6 +75,7 @@ export async function rename(oldName: string, newName: string) {
   db.prepare("UPDATE git SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE domains SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE share SET app = ? WHERE app = ?").run(newName, oldName);
+  moveFreeSetting(oldName, newName);
   db.prepare("UPDATE crons SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE backups SET app = ? WHERE app = ?").run(newName, oldName);
   db.prepare("UPDATE apps SET preview_of = ? WHERE preview_of = ?").run(newName, oldName);
