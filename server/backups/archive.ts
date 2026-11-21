@@ -4,7 +4,8 @@
 //     meta.json        what's inside, when, which app
 //     database.dump    pg_dump of the app's database (if it has one)
 //     storage/…        every file in the app's storage bucket (if it has one)
-//     data/…           the app's data folder, DATA_DIR (if it has saved anything there)
+//     data/…           the app's /data folder (DATA_DIR)
+//     folders/…        its extra persistent folders, if it has any
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -14,7 +15,7 @@ import { run } from "../lib/shell.ts";
 import * as s3 from "../lib/s3.ts";
 import { enabled as hasDatabase } from "../services/postgres/index.ts";
 import { enabled as hasStorage, clientFor as storageOf } from "../services/files/index.ts";
-import { hasAppData, dataPath, ensureDataDir } from "../lib/appdata.ts";
+import { hasAppData, dataPath, foldersPath, ensureDataDir } from "../lib/appdata.ts";
 import { containerName } from "../deploy/network.ts";
 
 const dbName = (app: string) => "app_" + app.replace(/-/g, "_");
@@ -66,11 +67,14 @@ export async function pack(app: string, log: (l: string) => void) {
     }
 
     if (hasAppData(app)) {
-      log("Saving data folder…");
+      log("Saving persistent folders…");
       // Pause the app for the copy, so a file (like an SQLite database) isn't half-written.
       // Paused, not stopped: visitors just wait a moment, nothing restarts.
       const paused = await run("docker", ["pause", containerName(app)]).then(() => true, () => false);
-      try { await run("cp", ["-a", dataPath(app), join(tmp, "data")]); }
+      try {
+        if (existsSync(dataPath(app))) await run("cp", ["-a", dataPath(app), join(tmp, "data")]);
+        if (existsSync(foldersPath(app))) await run("cp", ["-a", foldersPath(app), join(tmp, "folders")]);
+      }
       finally { if (paused) await run("docker", ["unpause", containerName(app)]).catch(() => {}); }
       meta.dataFolder = true;
     }
@@ -109,12 +113,14 @@ export async function unpack(app: string, file: string, log: (l: string) => void
       for (const key of keep) await s3.upload(store, key, join(tmp, "storage", key));
       log(`${keep.size} files restored.`);
     }
-    if (existsSync(join(tmp, "data"))) {
-      log("Restoring data folder…");
-      // Make the folder match the backup exactly.
+    if (existsSync(join(tmp, "data")) || existsSync(join(tmp, "folders"))) {
+      log("Restoring persistent folders…");
+      // Make the folders match the backup exactly.
       rmSync(dataPath(app), { recursive: true, force: true });
+      rmSync(foldersPath(app), { recursive: true, force: true });
       mkdirSync(dirname(dataPath(app)), { recursive: true });
-      await run("cp", ["-a", join(tmp, "data"), dataPath(app)]);
+      if (existsSync(join(tmp, "data"))) await run("cp", ["-a", join(tmp, "data"), dataPath(app)]);
+      if (existsSync(join(tmp, "folders"))) await run("cp", ["-a", join(tmp, "folders"), foldersPath(app)]);
       ensureDataDir(app);
     }
     return meta;

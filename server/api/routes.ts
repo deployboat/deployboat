@@ -9,6 +9,7 @@ import { extract } from "../deploy/extract.ts";
 import { requireLogin, login, logout, setLoginCookie } from "./auth.ts";
 import { tokens } from "./tokens.ts";
 import { apps } from "./apps.ts";
+import { files } from "./files.ts";
 import { server } from "./server.ts";
 import { git } from "./git.ts";
 import { doctor } from "./doctor.ts";
@@ -36,6 +37,7 @@ app.post("/auth/logout", logout);
 // Everything under /api needs the token.
 app.use("/api/*", requireLogin);
 app.route("/api/apps", apps);
+app.route("/api/apps", files);
 app.route("/api/server", server);
 app.route("/api/git", git);
 app.route("/api/doctor", doctor);

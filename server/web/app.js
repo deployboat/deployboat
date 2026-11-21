@@ -99,6 +99,10 @@ const paths = {
   down: "M6 9l6 6 6-6",
   dots: "M5 12h.01M12 12h.01M19 12h.01",
   disk: "M4 4h16v16H4zM4 14h16M8 17h.01",
+  file: "M14 3H6v18h12V7zM14 3v4h4",
+  edit: "M4 20h4L19 9l-4-4L4 16zM13 7l4 4",
+  upload: "M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12",
+  x: "M6 6l12 12M18 6L6 18",
   chat: "M21 12a8 8 0 01-11.6 7.1L3 21l1.9-6.4A8 8 0 1121 12z",
   send: "M22 2L11 13M22 2l-7 20-4-9-9-4z",
   link: "M10 14a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 10a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1",
@@ -153,7 +157,7 @@ function drawNav(page, appName, section) {
 async function render() {
   cleanup(); cleanup = () => {};
   document.getElementById("top").hidden = false;
-  const hash = location.hash.slice(1) || "/";
+  const hash = location.hash.slice(1).split("?")[0] || "/"; // "?…" is for the screen itself
   const [, page, name, tab] = hash.split("/");
 
   drawNav(page, name && decodeURIComponent(name), tab || "overview");

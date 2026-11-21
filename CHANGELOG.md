@@ -6,6 +6,12 @@ Each `## x.y.z` section below becomes the notes of that GitHub Release (see `rel
 To update a server: `curl -fsSL deployboat.github.io/install.sh | sudo bash`, or **Doctor → Update now** in the dashboard.
 To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 
+## Unreleased
+
+- **Persistent storage on the app's Overview.** `/data` is always kept; click the edit button to add more folders (like `/app/uploads`). They survive deploys and are backed up too. Replaces the Data folder page.
+- **Files page for every app.** Browse its persistent folders, open and edit text files, upload, download, make folders and delete.
+- Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
+
 ## 0.5.0
 
 The first numbered release. Servers now install releases instead of the newest code on `main`.

@@ -21,7 +21,7 @@ import { crons } from "./crons.ts";
 import { enabledServices, addService, removeService, isService } from "../services/index.ts";
 import { getAppMail, saveAppMail } from "../services/email/index.ts";
 import { sendEmail } from "../alerts/channels/email.ts";
-import { dataUsage, DATA_DIR } from "../lib/appdata.ts";
+import { DATA_DIR, extraFolders, saveExtraFolders } from "../lib/appdata.ts";
 
 export const apps = new Hono();
 
@@ -105,6 +105,7 @@ apps.get("/:name", async (c) => {
     building: isBusy(name),
     stopped: isStopped(name),
     git: gitInfo(name),
+    folders: [DATA_DIR, ...extraFolders(name)], // persistent storage, kept across deploys
     ...previewInfo(name),
     deploys,
   });
@@ -171,8 +172,16 @@ apps.get("/:name/database", async (c) => {
   return c.json({ url: getEnv(name).DATABASE_URL ?? null, tables: await tables(name) });
 });
 
-// The app's data folder (DATA_DIR): where it is and how much is in it.
-apps.get("/:name/data", async (c) => c.json({ path: DATA_DIR, ...(await dataUsage(c.req.param("name"))) }));
+// Persistent storage: /data is always there; save the extra folders, then restart
+// so the new container has them.
+apps.put("/:name/folders", async (c) => {
+  const name = c.req.param("name");
+  const { folders } = await c.req.json<{ folders: string[] }>();
+  try { saveExtraFolders(name, Array.isArray(folders) ? folders.map(String) : []); }
+  catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  await restart(name).catch(() => {}); // fine if it was never deployed
+  return c.json({ ok: true, folders: [DATA_DIR, ...extraFolders(name)] });
+});
 
 apps.get("/:name/storage", async (c) => {
   const name = c.req.param("name");

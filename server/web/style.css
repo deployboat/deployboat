@@ -65,8 +65,8 @@ h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
 .btn.danger:hover { border-color: var(--bad); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn svg.i { width: 15px; height: 15px; }
-input { font: inherit; width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
-input:focus { outline: 2px solid var(--soft); border-color: var(--accent); }
+input, textarea { font: inherit; width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); }
+input:focus, textarea:focus { outline: 2px solid var(--soft); border-color: var(--accent); }
 code, pre { font-family: var(--mono); font-size: 12.5px; }
 
 /* status dot */
@@ -452,3 +452,25 @@ details.guide summary { cursor: pointer; }
 /* settings tabs */
 .tabs svg.i { width: 16px; height: 16px; }
 .tabintro { margin: -4px 0 14px; }
+
+/* App → Overview: persistent storage folders */
+.folderform { display: grid; gap: 8px; max-width: 420px; }
+.folderform .linkbtn { display: inline-flex; align-items: center; gap: 4px; justify-self: start; }
+.folderform .linkbtn svg.i { width: 13px; height: 13px; }
+
+/* App → Files */
+.filebar { flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--line); }
+.crumbs { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 13px; flex-wrap: wrap; }
+.crumbs a { color: var(--accent); cursor: pointer; }
+.files .filerow { cursor: pointer; padding-top: 8px; padding-bottom: 8px; }
+.files .filerow:hover { background: var(--soft); }
+.files .filerow > svg.i { color: var(--muted); flex: none; }
+.files .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files .fsize, .files .fdate { flex: none; white-space: nowrap; }
+.files .fsize { width: 70px; text-align: right; font-size: 13px; }
+.files .fdate { width: 90px; text-align: right; font-size: 13px; }
+.files .btn.ghost { opacity: 0; }
+.files .filerow:hover .btn.ghost { opacity: 1; }
+@media (hover: none) { .files .btn.ghost { opacity: 1; } }
+@media (max-width: 600px) { .files .fdate { display: none; } }
+textarea.code { width: 100%; font-family: var(--mono); font-size: 12.5px; line-height: 1.5; resize: vertical; }

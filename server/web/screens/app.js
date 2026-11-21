@@ -6,15 +6,16 @@ import { lineChart, uptimeStrip } from "../chart.js";
 import { rangePicker } from "./ranges.js";
 import { bytes } from "../app.js";
 import { dnsHelp, wireCopy } from "./dns.js";
+import { filesPage } from "./files.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
   ["overview", "Overview", "home"],
   ["domains", "Domains", "globe"],
-  ["data", "Data folder", "disk"],
   ["storage", "Storage", "folder"],
   ["email", "Email", "mail"],
   ["database", "Database", "db"],
+  ["files", "Files", "file"],
   ["share", "Share", "share"],
   ["crons", "Crons", "clock"],
   ["versions", "Versions", "history"],
@@ -46,7 +47,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs, variables, database, data, storage, email, domains, share, crons, settings }[section] ?? overview;
+  const show = { overview, versions, logs, variables, database, files: filesPage, storage, email, domains, share, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -95,8 +96,7 @@ function overview(box, base, app) {
         <dt>Address</dt><dd><a href="${esc(app.url)}" target="_blank">${esc(app.url)}</a></dd>
         ${app.filesUrl ? `<dt>Files</dt><dd><a href="${esc(app.filesUrl)}" target="_blank">${esc(app.filesUrl)}</a></dd>` : ""}
         <dt>Services</dt><dd>${app.services.length ? app.services.map((x) => ({ database: "Database", storage: "Storage", email: "Email" })[x]).join(", ") : `<span class="muted">None. Add a database or storage from the menu.</span>`}</dd>
-        <dt>Data folder</dt><dd><code>DATA_DIR</code> <span class="muted">· save files there, everything else is reset on each deploy.</span>
-          <a href="#/apps/${encodeURIComponent(app.name)}/data" style="color:var(--accent)">Details</a></dd>
+        <dt>Persistent storage</dt><dd id="folders"></dd>
         <dt>Last deploy</dt><dd>${timeAgo(app.deploys[0]?.created_at)}</dd>
         <dt>Container</dt><dd>${esc(app.state)}</dd>
         ${app.git ? `<dt>Git</dt><dd>${esc(app.git.repo)} <span class="muted">(${esc(app.git.branch)})</span></dd>` : ""}
@@ -108,6 +108,7 @@ function overview(box, base, app) {
   const mon = document.createElement("div");
   box.append(mon);
   box.stop = monitoring(mon, app);
+  persistentFolders(box.querySelector("#folders"), base, app);
   wireAutoDeploy(box, base, app);
   box.querySelector("#redeploy")?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;
@@ -117,6 +118,50 @@ function overview(box, base, app) {
       location.hash = `#/apps/${encodeURIComponent(app.name)}/versions`;
     } catch (err) { toast(err.message); }
   });
+}
+
+// Persistent storage on the Overview: the folders kept across deploys.
+// /data is always there; the edit button lets you add or remove extra folders.
+function persistentFolders(el, base, app) {
+  let folders = app.folders;
+  const show = () => {
+    el.innerHTML = `
+      <span class="row" style="gap:6px">${folders.map((f) => `<code class="tag">${esc(f)}</code>`).join("")}
+        <button class="btn ghost sm" id="editfolders" title="Edit folders">${icon("edit")}</button></span>
+      <div class="note" style="margin-top:4px">Files saved here survive deploys and are backed up.
+        Everything else is reset on each deploy. <code>/data</code> is also in <code>DATA_DIR</code>.</div>`;
+    el.querySelector("#editfolders").onclick = edit;
+  };
+  const edit = () => {
+    const extra = folders.slice(1);
+    const row = (v = "") => `<div class="row folderrow" style="flex-wrap:nowrap;gap:6px">
+      <input name="f" value="${esc(v)}" placeholder="/app/uploads">
+      <button type="button" class="btn ghost sm" data-rm title="Remove">${icon("x")}</button></div>`;
+    el.innerHTML = `
+      <form class="folderform">
+        <div class="row" style="gap:6px"><code class="tag">/data</code><span class="note">always kept</span></div>
+        <div id="extra">${extra.map(row).join("")}</div>
+        <button type="button" class="linkbtn" id="addf">${icon("plus")} Add folder</button>
+        <p class="note">Use the full path inside your app. Saving restarts the app.
+          A new folder starts empty, so files your image already had at that path are hidden.</p>
+        <div class="row" style="gap:6px"><button class="btn primary">Save &amp; restart</button>
+          <button type="button" class="btn" data-x>Cancel</button></div>
+      </form>`;
+    const f = el.querySelector("form"), list = el.querySelector("#extra");
+    const wire = () => list.querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => b.parentElement.remove()));
+    wire();
+    el.querySelector("#addf").onclick = () => { list.insertAdjacentHTML("beforeend", row()); wire(); list.lastElementChild.querySelector("input").focus(); };
+    el.querySelector("[data-x]").onclick = show;
+    f.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = f.querySelector(".primary"); btn.disabled = true; btn.textContent = "Saving…";
+      try {
+        const r = await api(`${base}/folders`, { method: "PUT", body: { folders: [...f.querySelectorAll("[name=f]")].map((i) => i.value) } });
+        folders = r.folders; toast("Saved. The app restarted with the new folders."); show();
+      } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Save & restart"; }
+    };
+  };
+  show();
 }
 
 // Uptime, response time, CPU and memory over time.
@@ -548,35 +593,6 @@ async function database(box, base, app) {
     </div>`;
   wireFields(box);
   removeServiceBox(box, base, app, "database");
-}
-
-// Data folder: the one place in the app where saved files survive deploys.
-async function data(box, base) {
-  const d = await api(`${base}/data`);
-  box.innerHTML = `
-    <div class="stats">
-      <div class="card stat"><b>${bytes(d.bytes)}</b><span>used</span></div>
-      <div class="card stat"><b>${d.files.toLocaleString()}</b><span>${d.files === 1 ? "file" : "files"}</span></div>
-      <div class="card stat"><b>Nightly</b><span>in backups</span></div>
-    </div>
-    <div class="card pad banner">${icon("info")}
-      <span class="grow" style="white-space:normal">Every deploy starts your app fresh. <b>Files it saves are lost, unless they're in the data folder.</b>
-        Use it for SQLite databases, uploads and anything else the app writes.</span></div>
-    <div class="card pad">
-      <dl class="info">
-        ${field("Folder in your app", d.path)}
-        ${field("Variable", "DATA_DIR")}
-      </dl>
-      <p class="muted" style="font-size:13px;margin:14px 0 6px">Use the variable instead of a fixed path. For example, an SQLite database:</p>
-      <pre class="log" style="max-height:none">// Node.js
-const db = new Database(path.join(process.env.DATA_DIR, "app.db"));
-
-# Python
-db = sqlite3.connect(os.path.join(os.environ["DATA_DIR"], "app.db"))</pre>
-      <p class="note" style="margin-top:10px">It's kept when you deploy, restart or roll back, and it's backed up every night with the app.
-        AI agents know about it too: Deploy Boat's guide tells them to use <code>DATA_DIR</code>.</p>
-    </div>`;
-  wireFields(box);
 }
 
 async function storage(box, base, app) {
