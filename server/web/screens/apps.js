@@ -13,7 +13,7 @@ const SORTS = {
 };
 const GROUPS = { none: "None", group: "Your groups", status: "Status" };
 const STATUSES = { all: "All", live: "Live", failed: "Failed", building: "Building", stopped: "Stopped" };
-const SERVICES = { database: ["db", "Database"], storage: ["folder", "Storage"], email: ["mail", "Email"] };
+const SERVICES = { database: ["db", "Database"], storage: ["folder", "Storage"] };
 const cmpDate = (a, b) => (a ?? "").localeCompare(b ?? "");
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
