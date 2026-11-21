@@ -21,6 +21,7 @@ import { crons } from "./crons.ts";
 import { enabledServices, addService, removeService, isService } from "../services/index.ts";
 import { getAppMail, saveAppMail } from "../services/email/index.ts";
 import { sendEmail } from "../alerts/channels/email.ts";
+import { logLines } from "../lib/logs.ts";
 import { DATA_DIR, extraFolders, saveExtraFolders } from "../lib/appdata.ts";
 
 export const apps = new Hono();
@@ -116,6 +117,19 @@ apps.get("/:name/deploys/:id", (c) => {
     .get(c.req.param("name"), Number(c.req.param("id")));
   return row ? c.json(row) : c.json({ error: "Deploy not found." }, 404);
 });
+
+// The same logs as lines with a time and a level, for the Logs page. ?since= (like "2026-11-21T10:00:00Z")
+// returns only newer lines, so the page can add to what it shows.
+apps.get("/:name/logs/lines", async (c) => {
+  const lines = Math.min(Number(c.req.query("lines")) || 500, 5000);
+  return c.json(await logLines(c.req.param("name"), lines, c.req.query("since") || undefined));
+});
+
+// The latest runs of all the app's cron jobs, with their output.
+apps.get("/:name/logs/crons", (c) => c.json(db.prepare(`
+  SELECT r.id, r.started_at, r.duration_ms, r.status, r.attempts, r.output, j.name AS job
+  FROM cron_runs r JOIN crons j ON j.id = r.cron_id
+  WHERE j.app = ? ORDER BY r.id DESC LIMIT 100`).all(c.req.param("name"))));
 
 apps.get("/:name/logs", async (c) => c.text(await appLogs(c.req.param("name"), Math.min(Number(c.req.query("lines")) || 200, 2000))));
 

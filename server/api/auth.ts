@@ -22,6 +22,7 @@ const AGENT_CAN: [string, RegExp][] = [
   ["GET", /^\/api\/apps$/],
   ["GET", new RegExp(`^${APP}$`)],
   ["GET", new RegExp(`^${APP}/logs$`)],
+  ["GET", new RegExp(`^${APP}/logs/lines$`)],
   ["GET", new RegExp(`^${APP}/deploys/\\d+$`)],
   ["GET", new RegExp(`^${APP}/env$`)],          // names only, see api/apps.ts
   ["PUT", new RegExp(`^${APP}/env$`)],

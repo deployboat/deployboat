@@ -100,7 +100,7 @@ code, pre { font-family: var(--mono); font-size: 12.5px; }
 .empty pre { display: inline-block; text-align: left; background: var(--bg); border: 1px solid var(--line); padding: 12px 16px; border-radius: 8px; margin-top: 14px; }
 
 /* tabs */
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; overflow-y: hidden; }
 .tabs a { display: flex; gap: 6px; align-items: center; padding: 10px 14px; text-decoration: none; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .tabs a.on { color: var(--ink); border-color: var(--ink); }
 
@@ -540,3 +540,46 @@ details.guide summary { cursor: pointer; }
   .fb > .fb-side { max-height: 60vh; }
   .fb > .fb-editor { min-height: 70vh; }
 }
+
+/* App → Logs */
+.logtabs a { cursor: pointer; }
+.tabcount { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 99px; background: var(--soft); color: var(--muted); }
+.tabcount.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.logbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.logsearch { flex: 0 1 260px; min-width: 160px; }
+.logbar select { width: auto; flex: none; font: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
+.logbar #live.on { color: var(--ok); }
+.livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; animation: livepulse 1.6s infinite; }
+@keyframes livepulse { 50% { opacity: .35; } }
+.lvdot { flex: none; width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: var(--c); }
+.ll.error { --c: var(--bad); } .ll.warn { --c: var(--warn); }
+.ll.info { --c: var(--muted); } .ll.debug { --c: #8b5cf6; } .ll.step { --c: var(--accent); }
+#levels button { text-transform: capitalize; }
+
+/* The log itself: always dark, like a terminal */
+.logview-wrap { position: relative; min-width: 0; }
+.logview { background: #18181b; color: #e4e4e7; border-radius: 10px; font: 12.5px/1.6 var(--mono); padding: 8px 0;
+  height: calc(100vh - 290px); min-height: 320px; overflow: auto; }
+.ll { display: flex; gap: 10px; padding: 0 14px; border-left: 2px solid transparent; }
+.ll:hover { background: #ffffff0d; }
+.ll time { color: #71717a; flex: none; }
+.ll b { flex: none; width: 44px; font-weight: 600; font-size: 10.5px; text-transform: uppercase; color: var(--c); padding-top: 1px; }
+.ll span { white-space: pre; }
+.logview.wrap .ll span { white-space: pre-wrap; word-break: break-word; }
+.logview.notime .ll time { display: none; }
+.ll.error { background: #dc26261a; border-left-color: #ef4444; }
+.ll.error span { color: #fca5a5; } .ll.warn span { color: #fcd34d; } .ll.debug span { color: #a1a1aa; }
+.ll.step span { color: #93c5fd; font-weight: 600; }
+.ll mark { background: #facc15; color: #18181b; border-radius: 2px; }
+.logempty { color: #a1a1aa; padding: 24px 16px; text-align: center; font-family: "Inter", system-ui, sans-serif; }
+.logempty svg.i { color: #4ade80; vertical-align: -3px; }
+.jump { position: absolute; bottom: 14px; left: 50%; translate: -50% 0; box-shadow: 0 4px 16px #0005; }
+.logfoot { margin-top: 6px; }
+.logsplit { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 12px; }
+.logsplit .logview { height: calc(100vh - 230px); }
+.loglist { overflow-y: auto; max-height: calc(100vh - 230px); padding: 4px; }
+.loglist button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 7px; color: inherit; font: inherit; }
+.loglist button:hover { background: var(--bg); } .loglist button.on { background: var(--soft); }
+.loglist .note { display: block; }
+.cronrun .log { margin: 0; max-height: 320px; }
+@media (max-width: 800px) { .logsplit { grid-template-columns: minmax(0, 1fr); } .loglist { max-height: 200px; } .logview { height: 60vh; } }

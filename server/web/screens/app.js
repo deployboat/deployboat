@@ -7,6 +7,7 @@ import { rangePicker } from "./ranges.js";
 import { bytes } from "../app.js";
 import { dnsHelp, wireCopy } from "./dns.js";
 import { filesPage } from "./files.js";
+import { logsPage } from "./logs.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -47,7 +48,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs, variables, database, files: filesPage, storage, email, domains, share, crons, settings }[section] ?? overview;
+  const show = { overview, versions, logs: logsPage, variables, database, files: filesPage, storage, email, domains, share, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -407,21 +408,6 @@ function versions(box, base, app) {
       versions(box, base, await api(base));
     } catch (err) { toast(err.message); b.disabled = false; }
   }));
-}
-
-// Live logs: refresh every 3 seconds, stay at the bottom unless you scrolled up.
-async function logs(box, base) {
-  box.innerHTML = `<pre class="log" id="applog">Loading…</pre>`;
-  const pre = box.querySelector("#applog");
-  async function load() {
-    const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
-    pre.textContent = (await api(`${base}/logs`)) || "No output yet.";
-    if (atBottom) pre.scrollTop = pre.scrollHeight;
-  }
-  await load();
-  pre.scrollTop = pre.scrollHeight;
-  const timer = setInterval(() => load().catch(() => {}), 3000);
-  return () => clearInterval(timer);
 }
 
 async function variables(box, base) {
