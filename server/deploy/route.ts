@@ -12,9 +12,14 @@ import { filesHost, webUpstream, enabled as hasStorage } from "../services/files
 import { domainsOf, appHosts, dashboardHosts } from "../lib/domains.ts";
 import { getShare } from "../lib/share.ts";
 
+// A list of hosts without repeats. Caddy refuses the whole config (and every site goes
+// down) if a host is listed twice, e.g. files.app.<domain> and files.app.<ip>.nip.io are
+// the same name when the server has no domain of its own yet.
+const unique = (hosts: string[]) => [...new Set(hosts)];
+
 // Send requests for `hosts` to `dial`. Optionally rewrite the Host header.
 const route = (hosts: string | string[], dial: string, hostHeader?: string) => ({
-  match: [{ host: [hosts].flat() }],
+  match: [{ host: unique([hosts].flat()) }],
   handle: [{
     handler: "reverse_proxy",
     upstreams: [{ dial }],
@@ -27,7 +32,7 @@ const route = (hosts: string | string[], dial: string, hostHeader?: string) => (
 //   2. has that cookie → straight to the app
 //   3. everyone else   → username/password prompt, then the app
 function appRoutes(app: string) {
-  const hosts = [...appHosts(app), ...domainsOf(app)];
+  const hosts = unique([...appHosts(app), ...domainsOf(app)]);
   const proxy = { handler: "reverse_proxy", upstreams: [{ dial: `${containerName(app)}:3000` }] };
   const s = getShare(app);
   if (s.mode !== "password" || !s.password_hash || !s.token) return [{ match: [{ host: hosts }], handle: [proxy], terminal: true }];
