@@ -8,6 +8,18 @@
   :root { --bg: #111113; --card: #19191c; --ink: #f4f4f5; --muted: #a1a1aa; --line: #2a2a2e; --accent: #6b9bff; --soft: #1b2440; }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+:root { color-scheme: light dark; } /* native parts (inputs, scrollbars) follow light/dark mode */
+
+/* Scrollbars: thin, rounded, in our colors. Shows up only as a soft pill, darker on hover.
+   Chrome, Edge and Safari use the ::-webkit rules; Firefox uses scrollbar-color/width. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 99px;
+  border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--muted) 60%, transparent); }
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 40%, transparent) transparent; }
+}
 body { background: var(--bg); color: var(--ink); font: 14.5px/1.5 "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 button { font: inherit; cursor: pointer; }
