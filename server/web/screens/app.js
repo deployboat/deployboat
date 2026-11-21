@@ -5,9 +5,9 @@ import { crons } from "./crons.js";
 import { lineChart, uptimeStrip } from "../chart.js";
 import { rangePicker } from "./ranges.js";
 import { bytes } from "../app.js";
-import { dnsHelp, wireCopy } from "./dns.js";
 import { filesPage } from "./files.js";
 import { logsPage } from "./logs.js";
+import { domainsPage } from "./domains.js";
 
 // [id, label, icon, soon?] — the sidebar is built from this list.
 export const SECTIONS = [
@@ -47,7 +47,7 @@ export async function appScreen(view, name, section) {
   headerActions(view, base, app);
   const navTitle = document.querySelector(".navtitle");
   if (navTitle) navTitle.textContent = app.displayName;
-  const show = { overview, versions, logs: logsPage, variables, database, files: filesPage, storage, email, domains, crons, settings }[section] ?? overview;
+  const show = { overview, versions, logs: logsPage, variables, database, files: filesPage, storage, email, domains: domainsPage, crons, settings }[section] ?? overview;
   const stop = await show(box, base, app);
   return () => { stop?.(); box.stop?.(); };
 }
@@ -276,85 +276,6 @@ function settings(box, base, app) {
 }
 
 // Domains: change the free address, add your own domains.
-async function domains(box, base, app) {
-  const d = await api(`${base}/domains`);
-  box.innerHTML = `
-    <form class="card pad" id="address">
-      <b>Free address</b>
-      <p class="muted" style="font-size:13px;margin:2px 0 10px">Always works, HTTPS included. Changing it keeps your database, files and project folder working.
-        ${d.baseDomain !== d.nipDomain ? `<br><code>${esc(app.name)}.${esc(d.nipDomain)}</code> works too, as a backup.` : ""}</p>
-      <div class="row" style="flex-wrap:nowrap">
-        <input name="name" value="${esc(app.name)}" pattern="[a-z0-9][a-z0-9\-]*" required style="flex:1;min-width:100px">
-        <span class="muted" style="white-space:nowrap">.${esc(d.baseDomain)}</span>
-        <button class="btn primary">Change</button>
-      </div>
-    </form>
-
-    <div class="card" style="margin-top:14px">
-      <div class="pad" style="padding-bottom:0">
-        <b>Your own domains</b>
-        <p class="muted" style="font-size:13px;margin:2px 0 12px">Use a domain you own, like <code>myshop.com</code>. HTTPS is set up automatically.</p>
-        <form class="row" id="add" style="margin-bottom:16px">
-          <input name="host" placeholder="myshop.com" style="flex:1;min-width:180px" required autocomplete="off">
-          <button class="btn primary">${icon("plus")} Add domain</button>
-        </form>
-      </div>
-      <div class="list" style="border-top:1px solid var(--line)">${d.custom.map((x) => `
-        <div class="domrow">
-          <div class="row">
-            <span class="status ${x.ready ? "live" : "building"}">${x.ready ? "Connected" : "Needs a DNS change"}</span>
-            <a class="grow" href="https://${esc(x.host)}" target="_blank" style="text-decoration:none">${esc(x.host)}</a>
-            <button class="btn danger" data-del="${esc(x.host)}">${icon("trash")}</button>
-          </div>
-          ${x.ready ? "" : dnsHelp(x.dns)}
-        </div>`).join("") || `<div class="muted">No domains yet.</div>`}
-      </div>
-    </div>
-
-    ${!d.custom.length ? `
-    <div class="card pad" style="margin-top:14px">
-      <b>How to connect a domain</b>
-      <ol class="steps" style="margin-top:10px">
-        <li>Add it above.</li>
-        <li>Open the DNS settings where you bought it (Namecheap, GoDaddy, Cloudflare…) and add the record this page shows you.
-          Usually an <b>A record</b> with value <code>${esc(d.ip)}</code>.</li>
-        <li>Wait a few minutes. Deploy Boat checks the DNS, tells you if something's off, and sets up HTTPS once it's right.</li>
-      </ol>
-    </div>` : ""}`;
-  wireCopy(box);
-
-  box.querySelector("#address").onsubmit = async (e) => {
-    e.preventDefault();
-    const newName = e.target.name.value.trim().toLowerCase();
-    if (newName === app.name) return;
-    if (!confirm(`Change the address to ${newName}.${d.baseDomain}? The old address stops working.`)) return;
-    try {
-      const r = await api(`${base}/rename`, { method: "POST", body: { newName } });
-      toast("Address changed");
-      location.hash = `#/apps/${encodeURIComponent(r.name)}/domains`;
-    } catch (err) { toast(err.message); }
-  };
-  box.querySelector("#add").onsubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const r = await api(`${base}/domains`, { method: "POST", body: { host: e.target.host.value } });
-      toast(r.ready ? "Domain connected" : "Added. Now add the DNS record shown below.");
-      domains(box, base, app);
-    } catch (err) { toast(err.message); }
-  };
-  box.querySelectorAll("[data-del]").forEach((b) => (b.onclick = async () => {
-    if (!confirm(`Remove ${b.dataset.del}?`)) return;
-    try { await api(`${base}/domains/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" }); toast("Removed"); domains(box, base, app); }
-    catch (err) { toast(err.message); }
-  }));
-
-  // Check DNS again every 15 seconds while a domain is waiting.
-  if (d.custom.some((x) => !x.ready)) {
-    const timer = setTimeout(() => box.isConnected && domains(box, base, app), 15000);
-    box.stop = () => clearTimeout(timer);
-  }
-}
-
 // Each version is a collapsible row. Opening it loads its build log.
 // While a version is building, it stays open and its log updates live.
 function versions(box, base, app) {

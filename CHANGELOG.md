@@ -12,6 +12,7 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 - **Files page for every app.** Browse everything inside the running app, edit files in a code editor (syntax colors, line numbers, Ctrl+S), and upload (drag and drop), download, rename and delete. Each folder shows whether it's kept across deploys. When the app is stopped, its persistent folders are still there.
 - **A new Logs page with tabs:** Runtime (live), Errors, Debug, Deploys (each version's build log) and Cron jobs (each run's output). Each line gets a time and a level (worked out from JSON logs or words like ERROR/WARN, with stack traces kept together). Search with highlights, level filters, pause/resume, jump to latest, wrap, copy and download.
 - **Sharing moved to the app's Overview**, next to the details: QR code, links to copy, and public or password protected in a few clicks. The separate Share page is gone.
+- **A clearer Domains page.** Every address in one place with copy and open buttons, the free address editable in place with a preview, "also add www" when you add a domain, and a live status per domain with step-by-step DNS help, a countdown to the next check and Check now.
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0
