@@ -386,7 +386,7 @@ export function removeServiceBox(box, base, app, service) {
   el.innerHTML = `
     <b>Delete ${db ? "database" : "storage"}</b>
     <p class="muted" style="font-size:13px;margin:2px 0 10px">${app.previewOf ? "Deletes this preview's data." :
-      `Deletes ${db ? "every table and row" : "every stored file"}. A last backup is made first, so you can restore it from Backups.`}
+      `Deletes ${db ? "every table and row" : "every stored file"}. A backup of it is made first, so you can restore it from Backups. This can take a minute; you can leave the page.`}
       The app restarts without ${db ? "<code>DATABASE_URL</code>" : "the <code>S3_*</code> variables"}.</p>
     <button class="btn danger">${icon("trash")} Delete ${db ? "database" : "storage"}</button>`;
   box.append(el);
@@ -394,10 +394,33 @@ export function removeServiceBox(box, base, app, service) {
     const typed = prompt(`This deletes ${app.displayName}'s ${db ? "database" : "stored files"}.\n\nType the app address name (${app.name}) to confirm:`);
     if (typed !== app.name) { if (typed !== null) toast("Name didn't match. Nothing deleted."); return; }
     const b = e.currentTarget;
-    b.disabled = true; b.innerHTML = `<span class="spinner" style="width:14px;height:14px"></span> Backing up and deleting…`;
-    try { await api(`${base}/services/${service}`, { method: "DELETE" }); toast("Deleted"); dispatchEvent(new HashChangeEvent("hashchange")); }
-    catch (err) { toast(err.message); b.disabled = false; b.textContent = `Delete ${db ? "database" : "storage"}`; }
+    b.disabled = true;
+    try { await api(`${base}/services/${service}`, { method: "DELETE" }); }
+    catch (err) { toast(err.message); b.disabled = false; return; }
+    followRemoval(el, base, service, b);
   };
+}
+
+// The deletion runs on the server in the background (services/removal.ts).
+// Show each step until it's done, then reload the page.
+function followRemoval(el, base, service, button) {
+  const label = service === "database" ? "database" : "storage";
+  const status = document.createElement("div");
+  status.className = "removal";
+  button.replaceWith(status);
+  const timer = setInterval(async () => {
+    if (!el.isConnected) return clearInterval(timer); // left the page; it keeps going on the server
+    const r = await api(`${base}/services/${service}/removal`).catch(() => null);
+    if (!r) return;
+    status.innerHTML = r.error ? `${icon("alert")} ${esc(r.error)}` : `<span class="spinner sm"></span> ${esc(r.step)}`;
+    status.classList.toggle("bad", !!r.error);
+    if (!r.done) return;
+    clearInterval(timer);
+    if (r.error) return toast(`The ${label} wasn't deleted.`);
+    toast(`${label === "database" ? "Database" : "Storage"} deleted. The backup is on the Backups page.`);
+    dispatchEvent(new HashChangeEvent("hashchange"));
+  }, 1500);
+  status.innerHTML = `<span class="spinner sm"></span> Starting…`;
 }
 
 // Shown when an app hasn't added a service yet.

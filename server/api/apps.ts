@@ -9,7 +9,6 @@ import * as s3 from "../lib/s3.ts";
 import { enabled as hasDb, engineOf, typeOf as dbTypeOf, isDbType } from "../services/database/index.ts";
 import { getGit, webhookSecret, setGitOptions } from "../deploy/git.ts";
 import { previewsOf } from "../deploy/previews.ts";
-import { backupNow } from "../backups/index.ts";
 import { isBusy, lock, unlock } from "../lib/lock.ts";
 import { resolveName, isStopped, displayName } from "../lib/db.ts";
 import { domainsOf, domainOwner, addDomain, removeDomain, hostTaken, freeAddressOn, setFreeAddress } from "../lib/domains.ts";
@@ -19,7 +18,8 @@ import { config } from "../lib/config.ts";
 import { share } from "./share.ts";
 import { isAdmin } from "./auth.ts";
 import { crons } from "./crons.ts";
-import { enabledServices, addService, removeService, isService, parseService } from "../services/index.ts";
+import { enabledServices, addService, isService, parseService } from "../services/index.ts";
+import { startRemoval, removalStatus } from "../services/removal.ts";
 import { logLines } from "../lib/logs.ts";
 import { DATA_DIR, extraFolders, saveExtraFolders } from "../lib/appdata.ts";
 
@@ -417,30 +417,20 @@ apps.put("/:name/git", async (c) => {
 });
 
 // Remove a database or storage and DELETE its data. A last backup is made first.
-apps.delete("/:name/services/:service", async (c) => {
+// Remove a database or storage and DELETE its data. A backup of that part is made first
+// (not for previews: their data is a throwaway copy). Runs in the background: the
+// dashboard then asks GET …/removal how it's going.
+apps.delete("/:name/services/:service", (c) => {
   const { name, service } = c.req.param();
   if (!isService(service)) return c.json({ error: "Use database or storage." }, 400);
-  if (!enabledServices(name).includes(service)) return c.json({ ok: true, services: enabledServices(name) });
-  if (isBusy(name)) return c.json({ error: "Wait until the current deploy finishes." }, 409);
-  const isPreview = !!previewInfo(name).previewOf;
-  if (!isPreview) {
-    try { await backupNow(name); }
-    catch (e) { return c.json({ error: `Couldn't make a last backup, so nothing was deleted: ${(e as Error).message}` }, 409); }
-    const last = db.prepare("SELECT status, note FROM backups WHERE app = ? ORDER BY id DESC LIMIT 1").get(name) as { status: string; note: string } | undefined;
-    if (last?.status !== "done") return c.json({ error: `The last backup failed, so nothing was deleted. ${last?.note ?? ""}` }, 409);
-  }
-  lock(name);
-  try {
-    await removeService(name, service);
-    await syncRoutes();
-    await restart(name).catch(() => {});
-    return c.json({ ok: true, services: enabledServices(name) });
-  } catch (e) {
-    return c.json({ error: (e as Error).message }, 500);
-  } finally {
-    unlock(name);
-  }
+  if (!enabledServices(name).includes(service)) return c.json({ ok: true, done: true });
+  try { startRemoval(name, service, { backup: !previewInfo(name).previewOf }); }
+  catch (e) { return c.json({ error: (e as Error).message }, 409); }
+  return c.json({ ok: true, started: true });
 });
+
+apps.get("/:name/services/:service/removal", (c) => c.json(removalStatus(c.req.param("name"))));
+
 
 // Put an app in a group (folder) on the Apps page. Empty = no group.
 apps.put("/:name/group", async (c) => {

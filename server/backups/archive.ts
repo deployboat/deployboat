@@ -19,8 +19,13 @@ import { containerName } from "../deploy/network.ts";
 
 export const hasData = (app: string) => hasDatabase(app) || hasStorage(app) || hasAppData(app);
 
+// What a backup can hold. Normally all of it; before deleting a database or storage,
+// only that part (it's quicker, and lighter on a small server).
+export type Part = "database" | "storage" | "data";
+export const ALL_PARTS: Part[] = ["database", "storage", "data"];
+
 // Make a backup file. Returns its path and what's in it.
-export async function pack(app: string, log: (l: string) => void) {
+export async function pack(app: string, log: (l: string) => void, parts: Part[] = ALL_PARTS) {
   const dir = join(config.dataDir, "backups", app);
   mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19); // 2026-11-18T03-00-00
@@ -32,12 +37,12 @@ export async function pack(app: string, log: (l: string) => void) {
     // SQLite has no dump: its file is in /data, saved below with the persistent folders.
     const meta = { app, createdAt: new Date().toISOString(), database: false as false | string, files: 0, dataFolder: false };
 
-    if (hasDatabase(app) && typeOf(app) !== "sqlite") {
+    if (parts.includes("database") && hasDatabase(app) && typeOf(app) !== "sqlite") {
       log("Saving database…");
       if (await engineOf(app).dump(app, tmp)) meta.database = typeOf(app);
     }
 
-    if (hasStorage(app)) {
+    if (parts.includes("storage") && hasStorage(app)) {
       log("Saving stored files…");
       const store = await storageOf(app);
       for (const obj of await s3.list(store)) {
@@ -49,7 +54,7 @@ export async function pack(app: string, log: (l: string) => void) {
       }
     }
 
-    if (hasAppData(app)) {
+    if (parts.includes("data") && hasAppData(app)) {
       log("Saving persistent folders…");
       // Pause the app for the copy, so a file (like an SQLite database) isn't half-written.
       // Paused, not stopped: visitors just wait a moment, nothing restarts.
@@ -63,7 +68,8 @@ export async function pack(app: string, log: (l: string) => void) {
     }
 
     writeFileSync(join(tmp, "meta.json"), JSON.stringify(meta, null, 2));
-    await run("tar", ["-czf", file, "-C", tmp, "."]);
+    // Compressing is the heavy part: run it at low priority so the server stays responsive.
+    await run("nice", ["-n", "15", "tar", "-czf", file, "-C", tmp, "."]);
     return { file, meta };
   } finally {
     rmSync(tmp, { recursive: true, force: true });

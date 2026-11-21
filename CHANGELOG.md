@@ -18,6 +18,7 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 - **Removed: email for apps.** Apps send email with their own provider (Resend, Postmark…), using an API key saved as a variable. Apps that already had email keep their `SMTP_*` variables, now as normal variables you can change or delete. Alert emails (Settings → Alerts) still work.
 - **Pick your database: PostgreSQL, MySQL (MariaDB) or SQLite.** The Database page explains each one. Also from the CLI (`deployboat add mysql`, `--with sqlite`) and for AI agents.
 - **A database viewer.** Browse tables page by page, see their structure, and run any SQL (with a check before changes), with results you can download as CSV. It runs as the app's own database user, so it can't touch other apps.
+- **Deleting a database or storage no longer freezes the dashboard.** It runs in the background and shows each step. The backup made first only holds the part being deleted, so it's much quicker, and backups compress at low priority so the server stays responsive.
 - Settings is one page with tabs (Security, Alerts, Domain), and the dashboard shows its version.
 
 ## 0.5.0

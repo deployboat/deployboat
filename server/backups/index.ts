@@ -9,7 +9,7 @@ import { config } from "../lib/config.ts";
 import { getSetting, setSetting } from "../lib/settings.ts";
 import { run } from "../lib/shell.ts";
 import { containerName } from "../deploy/run.ts";
-import { pack, unpack, hasData } from "./archive.ts";
+import { pack, unpack, hasData, ALL_PARTS, type Part } from "./archive.ts";
 import { remote, describe, type Remote } from "./remote/index.ts";
 import { notify } from "../alerts/index.ts";
 
@@ -45,13 +45,13 @@ export const isRunning = () => !!running;
 let log: string[] = [];
 export const currentLog = () => log;
 
-// Back up one app.
-async function backupApp(app: string, say: (l: string) => void) {
+// Back up one app (all of it, or only some parts, see archive.ts).
+async function backupApp(app: string, say: (l: string) => void, parts: Part[] = ALL_PARTS, why = "") {
   const { lastInsertRowid: id } = db.prepare("INSERT INTO backups (app, status) VALUES (?, 'running')").run(app);
   try {
     say(`${app}:`);
-    const { file, meta } = await pack(app, (l) => say(`  ${l}`));
-    const note = [meta.database && "database", meta.files && `${meta.files} files`, meta.dataFolder && "persistent folders"].filter(Boolean).join(", ") || "empty";
+    const { file, meta } = await pack(app, (l) => say(`  ${l}`), parts);
+    const note = ([meta.database && "database", meta.files && `${meta.files} files`, meta.dataFolder && "persistent folders"].filter(Boolean).join(", ") || "empty") + why;
     db.prepare("UPDATE backups SET status = 'done', file = ?, size = ?, note = ? WHERE id = ?").run(file, statSync(file).size, note, id);
 
     const r = getSettings().remote;
@@ -88,14 +88,15 @@ async function prune(app: string) {
 }
 
 // Back up every app with data (or just one). Only one run at a time.
-export function backupNow(only?: string) {
+// `parts` and `why` are for the backup made before deleting a database or storage.
+export function backupNow(only?: string, parts: Part[] = ALL_PARTS, why = "") {
   if (running) throw new Error("A backup is already running.");
   log = [];
   const say = (l: string) => log.push(l);
   running = (async () => {
     const apps = only ? [only] : (db.prepare("SELECT name FROM apps").all() as { name: string }[]).map((a) => a.name).filter(hasData);
     if (!apps.length) say("No apps with a database or storage. Nothing to back up.");
-    for (const app of apps) await backupApp(app, say);
+    for (const app of apps) await backupApp(app, say, parts, why);
   })().finally(() => (running = null));
   return running;
 }

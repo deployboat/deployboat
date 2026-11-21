@@ -740,3 +740,7 @@ a.stname:hover { color: var(--accent); }
 .dbmsg pre { white-space: pre-wrap; font: 12.5px/1.5 var(--mono); margin: 0; }
 .dbmsg svg.i { flex: none; margin-top: 2px; }
 @media (max-width: 800px) { .dbview { grid-template-columns: minmax(0, 1fr); } .dbside { border-right: 0; border-bottom: 1px solid var(--line); } .dbtables { max-height: 180px; } }
+
+/* Deleting a database or storage: the steps, as they happen */
+.removal { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--warn); }
+.removal.bad { color: var(--bad); }
