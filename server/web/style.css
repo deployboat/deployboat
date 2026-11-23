@@ -394,6 +394,8 @@ details.guide summary { cursor: pointer; }
 .doc-itext p.muted { font-size: 13px; }
 .doc-itext .doc-meta { margin-top: 6px; }
 .doc-iact { display: flex; gap: 8px; align-items: center; }
+/* the fix panel under a row spans all columns and reaches the card's edges */
+.doc-irow > .doc-fix { grid-column: 1 / -1; margin: 4px -16px -14px; border-radius: 0; }
 .doc-info > .doc-card { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
 @media (max-width: 600px) {
   .doc-irow { grid-template-columns: 22px 1fr; }

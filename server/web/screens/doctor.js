@@ -101,9 +101,9 @@ export async function doctorScreen(view) {
     view.querySelectorAll("[data-run]").forEach((b) => (b.onclick = () => runFix()));
   }
 
-  // "Good to know": one quiet row per item. If a fix is open, the row gets the full card treatment.
+  // "Good to know": one quiet row per item. An open fix shows under the row, full width.
   function infoRow(i) {
-    if (open.fix?.id === i.id) return card(i);
+    const f = open.fix?.id === i.id ? open.fix : null;
     return `
       <div class="doc-irow">
         <span class="doc-idot">${icon("info")}</span>
@@ -115,8 +115,9 @@ export async function doctorScreen(view) {
         </div>
         ${i.link || i.fix ? `<div class="doc-iact">
           ${i.link ? `<a class="btn" href="${esc(i.link)}" ${i.link.startsWith("http") ? 'target="_blank"' : ""}>${i.link.includes("/releases/") ? "What's new" : "Open"}</a>` : ""}
-          ${i.fix ? `<button class="btn" data-fix="${esc(i.id)}" ${data.fixing ? "disabled" : ""}>${esc(i.fix)}</button>` : ""}
+          ${i.fix && !f ? `<button class="btn" data-fix="${esc(i.id)}" ${data.fixing ? "disabled" : ""}>${esc(i.fix)}</button>` : ""}
         </div>` : ""}
+        ${f ? fixPanel(f) : ""}
       </div>`;
   }
 
