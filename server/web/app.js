@@ -6,6 +6,7 @@ import { settingsScreen } from "./screens/settings.js";
 import { watchSelects } from "./select.js";
 import { serverScreen } from "./screens/server.js";
 import { doctorScreen } from "./screens/doctor.js";
+import { privateScreen } from "./screens/private.js";
 import { processesScreen } from "./screens/processes.js";
 import { backupsScreen } from "./screens/backups.js";
 
@@ -187,6 +188,7 @@ async function render() {
     if (page === "settings") stop = await settingsScreen(box, name);
     else if (page === "system" && name) stop = await processesScreen(box, name);
     else if (page === "system") stop = await serverScreen(box);
+    else if (page === "doctor" && name === "private") stop = await privateScreen(box);
     else if (page === "doctor") stop = await doctorScreen(box);
     else if (page === "backups") stop = await backupsScreen(box);
     else if (page === "apps" && name) stop = await appScreen(box, decodeURIComponent(name), tab || "overview");

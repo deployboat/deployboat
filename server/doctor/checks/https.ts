@@ -6,6 +6,7 @@ import { db } from "../../lib/db.ts";
 import { domainsOf, dnsReady } from "../../lib/domains.ts";
 import { syncRoutes } from "../../deploy/route.ts";
 import { sh } from "../sh.ts";
+import { behindTunnel } from "../private/index.ts";
 
 // Days until the certificate for `host` expires, or null if there isn't a valid one.
 function daysLeft(host: string): Promise<number | null> {
@@ -35,6 +36,9 @@ export const https: Check = {
   id: "https",
   title: "HTTPS certificates",
   async check() {
+    // Behind a Cloudflare Tunnel, Cloudflare serves HTTPS. Our own certificates can't renew
+    // (nothing reaches the server from outside) and don't need to.
+    if (behindTunnel()) return { status: "ok", message: "Cloudflare serves HTTPS for your sites (the server is behind a tunnel)." };
     const list = await hosts();
     const results = await Promise.all(list.map(async (h) => ({ h, days: await daysLeft(h) })));
     const broken = results.filter((r) => r.days === null).map((r) => r.h);

@@ -2,6 +2,8 @@
 import { Hono } from "hono";
 import { report, runChecks, describeFix, startFix, history, setEvery, type Every } from "../doctor/index.ts";
 
+import { privateStatus, checkStep, markStep, setTunnel } from "../doctor/private/index.ts";
+
 export const doctor = new Hono();
 
 doctor.get("/", (c) => c.json(report()));
@@ -31,3 +33,20 @@ doctor.post("/fix/:id", (c) => {
 });
 
 doctor.get("/history", (c) => c.json(history()));
+
+// "Make your server private": progress, check one step, tick one step, tunnel mode.
+doctor.get("/private", (c) => c.json(privateStatus()));
+doctor.post("/private/:id/check", async (c) => {
+  try { return c.json(await checkStep(c.req.param("id"))); }
+  catch (e) { return c.json({ error: (e as Error).message }, 400); }
+});
+doctor.put("/private/:id", async (c) => {
+  const { done } = await c.req.json().catch(() => ({}));
+  markStep(c.req.param("id"), !!done);
+  return c.json(privateStatus());
+});
+doctor.put("/private-tunnel", async (c) => {
+  const { on } = await c.req.json().catch(() => ({}));
+  try { await setTunnel(!!on); return c.json(privateStatus()); }
+  catch (e) { return c.json({ error: (e as Error).message }, 500); }
+});

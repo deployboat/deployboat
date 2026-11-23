@@ -1,6 +1,7 @@
 // Server Doctor. Problems first, each with one clear action. Fixes run inside
 // their own card: what it will do → progress → result. Passed checks stay out of the way.
 import { api, esc, icon, toast, timeAgo } from "../app.js";
+import { STEP_COUNT } from "./private.js";
 
 const EVERY = { "10m": "every 10 min", "1h": "every hour", "1d": "once a day", manual: "manual only" };
 
@@ -19,9 +20,15 @@ export async function doctorScreen(view) {
   let timer, data = null, history = [];
   const open = { fix: null, passed: false, history: false }; // what the user has opened
 
+  let priv = null; // progress of "Make your server private"
+  const privateBadge = () => {
+    const n = priv ? Object.values(priv.steps).filter((x) => x.ok).length : 0;
+    return n ? `<span class="pill ${n >= STEP_COUNT ? "ok" : ""}">${n >= STEP_COUNT ? "Done" : `${n} of ${STEP_COUNT} done`}</span>` : "";
+  };
+
   async function load() {
     try {
-      [data, history] = await Promise.all([api("/api/doctor"), api("/api/doctor/history").catch(() => [])]);
+      [data, history, priv] = await Promise.all([api("/api/doctor"), api("/api/doctor/history").catch(() => []), api("/api/doctor/private").catch(() => null)]);
     } catch {
       view.innerHTML = `<div class="loading"><span class="spinner"></span>Reconnecting to your server…</div>`;
       timer = setTimeout(load, 4000); // e.g. during a server restart
@@ -52,6 +59,14 @@ export async function doctorScreen(view) {
         </div>
         <button class="btn" id="recheck" ${r.checking ? "disabled" : ""}>${r.checking ? `<span class="spinner sm"></span> Checking…` : "Check everything"}</button>
       </div>
+
+      <a class="card doc-private" href="#/doctor/private">
+        <span class="doc-ico">${icon("lock")}</span>
+        <span class="grow"><b>Make your server private</b>
+          <span class="muted">A step-by-step guide to take the server off the public internet with Tailscale and a Cloudflare Tunnel.</span></span>
+        ${privateBadge()}
+        ${icon("chevron")}
+      </a>
 
       ${attention.length ? `
         <h3 class="doc-h">Needs attention</h3>

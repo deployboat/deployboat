@@ -11,6 +11,7 @@ import { serviceGateway } from "./network.ts";
 import { filesHost, webUpstream, enabled as hasStorage } from "../services/files/index.ts";
 import { domainsOf, appHosts, dashboardHosts } from "../lib/domains.ts";
 import { getShare } from "../lib/share.ts";
+import { behindTunnel } from "../doctor/private/index.ts";
 
 // A list of hosts without repeats. Caddy refuses the whole config (and every site goes
 // down) if a host is listed twice, e.g. files.app.<domain> and files.app.<ip>.nip.io are
@@ -73,7 +74,13 @@ export async function syncRoutes() {
   ];
 
   const caddyConfig = {
-    apps: { http: { servers: { main: { listen: [":80", ":443"], routes } } } },
+    apps: { http: { servers: { main: {
+      listen: [":80", ":443"],
+      routes,
+      // Behind a Cloudflare Tunnel, visitors' HTTPS ends at Cloudflare and the tunnel talks plain
+      // http to us. Redirecting that to https would loop forever.
+      ...(behindTunnel() && { automatic_https: { disable_redirects: true } }),
+    } } } },
   };
 
   // This folder is mounted into the Caddy container as /data.

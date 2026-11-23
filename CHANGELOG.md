@@ -8,6 +8,8 @@ To install a specific version (or go back to one): add `-s -- --version v0.5.0`.
 
 ## Unreleased
 
+- **Make your server private** (Server Doctor). A step-by-step checklist that takes the server off the public internet: SSH through Tailscale, websites through a Cloudflare Tunnel, and every incoming port closed at your provider. Steps the server can verify have a Check button (Tailscale running, domain on Cloudflare, cloudflared running, every address answering through Cloudflare); the others you tick off. Progress is saved. Includes a "tunnel mode" switch so Caddy doesn't redirect the tunnel's plain-http requests in a loop.
+- Fixed: opening a fix in Server Doctor's "Good to know" list squeezed the details into a narrow column.
 - **Persistent storage on the app's Overview.** `/data` is always kept; click the edit button to add more folders (like `/app/uploads`). They survive deploys and are backed up too. Replaces the Data folder page.
 - **Files page for every app.** Browse everything inside the running app, edit files in a code editor (syntax colors, line numbers, Ctrl+S), and upload (drag and drop), download, rename and delete. Each folder shows whether it's kept across deploys. When the app is stopped, its persistent folders are still there.
 - **A new Logs page with tabs:** Runtime (live), Errors, Debug, Deploys (each version's build log) and Cron jobs (each run's output). Each line gets a time and a level (worked out from JSON logs or words like ERROR/WARN, with stack traces kept together). Search with highlights, level filters, pause/resume, jump to latest, wrap, copy and download.

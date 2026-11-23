@@ -959,3 +959,45 @@ a.stname:hover { color: var(--accent); }
 .btn.danger.solid:disabled { opacity: .45; filter: none; }
 @keyframes dlgfade { from { opacity: 0; } }
 @keyframes dlgpop { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+
+/* Server Doctor → Make your server private (web/screens/private.js) */
+.doc-private { display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 22px; color: var(--ink); text-decoration: none; --c: var(--accent); }
+.doc-private:hover { border-color: var(--accent); }
+.doc-private .grow { display: grid; gap: 2px; min-width: 0; }
+.doc-private .muted { font-size: 13.5px; }
+.doc-private > svg.i:last-child { color: var(--muted); flex-shrink: 0; }
+.pv-back { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; margin-bottom: 6px; text-decoration: none; }
+.pv-back svg.i { width: 14px; height: 14px; }
+.head p.muted { max-width: 640px; }
+.pv-progress { padding: 16px 18px; margin-bottom: 22px; display: grid; gap: 10px; }
+.pv-bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.pv-bar span { display: block; height: 100%; background: var(--ok); transition: width .3s; }
+.pv-note { margin: -4px 2px 8px; }
+.pv-list { margin-bottom: 22px; overflow: hidden; }
+.pv-step { display: grid; grid-template-columns: 28px 1fr auto; gap: 14px; align-items: start; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.pv-step:last-child { border-bottom: 0; }
+.pv-step.next { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.pv-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  border: 1.5px solid var(--line); color: var(--muted); }
+.pv-step.next .pv-num { border-color: var(--accent); color: var(--accent); }
+.pv-step.done .pv-num { border-color: var(--ok); background: var(--ok); color: #fff; }
+.pv-step.done .pv-num svg.i { width: 15px; height: 15px; }
+.pv-step.done > .pv-body > b { color: var(--muted); }
+.pv-body { display: grid; gap: 8px; min-width: 0; padding-top: 3px; }
+.pv-text { display: grid; gap: 8px; font-size: 14px; color: var(--muted); max-width: 680px; }
+.pv-cmd { display: flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 6px 6px 12px; max-width: 680px; }
+.pv-cmd code { flex: 1; font-size: 13px; overflow-x: auto; white-space: nowrap; }
+.pv-link { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; text-decoration: none; justify-self: start; }
+.pv-link svg.i { width: 13px; height: 13px; }
+.pv-result { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
+.pv-result svg.i { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+.pv-result.ok { color: var(--ok); } .pv-result.bad { color: var(--warn); }
+.pv-result .muted { white-space: nowrap; }
+.pv-acts { display: flex; gap: 6px; }
+.pv-acts .btn { white-space: nowrap; }
+.pv-undo { margin-bottom: 22px; display: grid; gap: 4px; }
+.pv-undo .muted { font-size: 13.5px; }
+@media (max-width: 600px) {
+  .pv-step { grid-template-columns: 28px 1fr; }
+  .pv-acts { grid-column: 2; }
+}
